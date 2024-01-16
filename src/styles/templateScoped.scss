@@ -1,0 +1,160 @@
+// 页面都要改掉的element样式
+.app-list-page{
+  //修改输入框的删除按钮
+  ::v-deep .el-input__suffix {
+    .el-input__suffix-inner {
+
+      // border-color: none;
+      .el-icon-circle-close:before {
+        content: "\e79d" !important;
+        font-size: 14px;
+        color: rgba(0, 0, 0, 0.4);
+      }
+    }
+  }
+
+  ::v-deep .el-input--suffix .el-input__inner {
+    padding: 5px 28px 5px 8px;
+  }
+
+  //时间日期选择图标去掉
+  ::v-deep .el-icon-date:before{
+    content: '' !important
+  }
+  ::v-deep .el-icon-time:before {
+    content: '' !important
+  }
+  ::v-deep .el-button--mini {
+    padding: 4px 10px;
+  }
+}
+//筛选框
+.screen-box {
+  ::v-deep .el-input--medium .el-input__inner {
+    height: 32px;
+    line-height: 32px;
+    color: rgba(0, 0, 0, 0.9);
+  }
+
+  ::v-deep .el-input--medium .el-input__icon {
+    line-height: 32px;
+  }
+
+  ::v-deep .el-cascader .el-input .el-icon-arrow-down {
+    height: 32px;
+  }
+
+  ::v-deep .el-cascader--medium {
+    line-height: 32px;
+  }
+
+  // 输入框提示语的样式
+  ::v-deep .el-input__inner {
+    &::placeholder {
+      color: rgba(0, 0, 0, 0.4);
+      font-size: 14px;
+    }
+  }
+
+  ::v-deep .el-cascader .el-input .el-input__inner:hover {
+    border-color: #0052d9;
+  }
+
+  ::v-deep .el-input__inner:hover {
+    border-color: #0052d9;
+  }
+
+}
+
+// 这是新增删除等功能操作框
+.operation-box{
+
+  ::v-deep .el-button--primary.is-plain:hover,
+  ::v-deep .el-button--primary.is-plain:focus{
+    color: #0052d9;
+  }
+}
+
+// 列表框和属性框
+.list-map-box {
+  .list-box {
+
+    /**
+    改变边框颜色
+    */
+    // ::v-deep .el-table--border,
+    // .el-table--group {
+    //   border-left: 1px solid #ececec !important;
+    //   border-top: 1px solid #ececec !important;
+    // }
+
+    /**
+    改变表格内竖线颜色
+    */
+    ::v-deep .el-table--border td,
+    .el-table--border th,
+    .el-table__body-wrapper .el-table--border.is-scrolling-left~.el-table__fixed {
+      border-right: 1px solid #ececec !important;
+    }
+
+    /**
+    改变表格内行线颜色
+    */
+    ::v-deep .el-table td,
+    .el-table th.is-leaf {
+      border-bottom: 1px solid #ececec !important;
+    }
+
+    ::v-deep .el-table thead tr th {
+      border-color: #ececec;
+    }
+  }
+
+  .list-details {
+    ::v-deep .details .el-form-item {
+      margin-bottom: 12px !important;
+    }
+  }
+}
+
+// 新增编辑弹窗
+.dialog-class {
+  ::v-deep .el-input--medium .el-input__inner {
+    height: 40px;
+    line-height: 40px;
+    color: rgba(0, 0, 0, 0.9);
+  }
+
+  ::v-deep .el-input--medium .el-input__icon {
+    line-height: 40px;
+  }
+
+  ::v-deep .el-cascader .el-input .el-icon-arrow-down {
+    height: 40px;
+  }
+
+  ::v-deep .el-cascader--medium {
+    line-height: 40px;
+  }
+
+  // 输入框提示语的样式
+  ::v-deep .el-input__inner {
+    &::placeholder {
+      color: rgba(0, 0, 0, 0.4);
+      font-size: 14px;
+    }
+  }
+
+  ::v-deep .el-cascader .el-input .el-input__inner:hover {
+    border-color: #0052d9;
+  }
+
+  ::v-deep .el-input__inner:hover {
+    border-color: #0052d9;
+  }
+
+  ::v-deep .details .el-form-item {
+    margin-bottom: 12px !important;
+  }
+  
+}

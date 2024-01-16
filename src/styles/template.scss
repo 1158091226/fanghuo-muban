@@ -1,0 +1,681 @@
+//模板列表页的样式
+// 设置新的列表页样式
+$app-list-primary-color: #0052D9;
+$app-list-danger-color: #F36D78;
+
+.app-list-page {
+  padding: 20px;
+  width: 100%;
+  min-height: calc(100vh - 105px);
+
+  // 筛选内容框
+  .screen-box {
+    width: 100%;
+    display: flex;
+
+    .screen-box-input {
+      max-width: 75%;
+      display: flex;
+
+      .screen-box-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-right: 12px;
+        font-size: 14px;
+        flex: 1;
+
+        .item-text {
+          color: rgba(0, 0, 0, 0.9);
+          font-size: 14px;
+          margin-right: 8px;
+        }
+      }
+    }
+
+    .screen-box-button {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      margin-left: 16px;
+
+      .text1 {
+        font-size: 14px;
+        color: rgba(0, 0, 0, 0.9);
+        cursor: pointer;
+      }
+
+      .text2 {
+        font-size: 14px;
+        color: rgba(0, 0, 0, 0.6);
+        cursor: pointer;
+      }
+
+      .btn {
+        margin: 0 24px 0 31px;
+        height: 32px;
+        width: 84px;
+        color: #FFFFFF 90%;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+      }
+    }
+  }
+
+  //操作按钮框，新增删除那些
+  .operation-box {
+    margin-top: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    .operation-box-left {
+      .btn1 {
+        height: 32px;
+        padding: 5px 16px !important;
+        border-color: $app-list-primary-color;
+        background-color: #fff;
+        margin-right: 12px;
+      }
+
+      .btn1:hover {
+        color: $app-list-primary-color;
+      }
+
+      .btn2 {
+        height: 32px;
+        padding: 5px 16px !important;
+        margin-right: 12px;
+        border-color: $app-list-danger-color;
+        color: $app-list-danger-color;
+        background-color: #fff;
+      }
+
+      .btn2:hover {
+        color: $app-list-danger-color;
+      }
+
+      .btn3,
+      .btn4,
+      .btn5 {
+        height: 32px;
+        margin-right: 12px;
+        padding: 5px 16px !important;
+      }
+
+      .btn3:hover,
+      .btn4:hover,
+      .btn5:hover {
+        border: 1px solid #dcdfe6;
+        color: #606266;
+      }
+
+      .btn3:focus,
+      .btn4:focus,
+      .btn5:focus {
+        border: 1px solid #dcdfe6;
+        color: #606266;
+      }
+    }
+
+    .operation-box-right {
+      display: flex;
+      align-items: center;
+
+      .text {
+        color: rgba(0, 0, 0, 0.9);
+        ;
+        font-size: 14px;
+        margin-left: 12px;
+        cursor: pointer;
+      }
+      .text-no{
+        margin-left: 12px;
+        font-size: 14px;
+        color: #999;
+        cursor: not-allowed;
+      }
+
+      .text:hover {
+        color: #266FE8;
+      }
+
+      .icon {
+        width: 12px;
+        height: 12px;
+        margin-left: 10px;
+        margin-right: 20px;
+        cursor: pointer;
+      }
+
+      .icon:hover {
+        color: #266FE8;
+      }
+
+      .selectColor {
+        color: $app-list-primary-color;
+      }
+    }
+  }
+
+  // 这个是装列表框和属性框 
+  .list-map-box {
+    width: 100%;
+    height: calc(100vh - 266px);
+    margin-top: 16px;
+    display: flex;
+    justify-content: space-between;
+
+    //列表框
+    .list-box {
+      position: relative;
+      // width: 600px;
+      min-width: 675px;
+      height: 100%;
+      background-color: #fff;
+      padding: 12px 24px;
+      border: 1px solid #fff;
+      border-radius: 4px;
+
+      .title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        font-family: PingFangSC-Semibold;
+      }
+
+      .list-table {
+        margin-top: 20px;
+        .list-table-icon {
+          cursor: pointer;
+          margin: 0 10px;
+        }
+      }
+
+      .list-draw {
+        height: 100%;
+        position: absolute;
+        top: 0;
+        right: -30px;
+        cursor: e-resize;
+      }
+    }
+
+    .list-box:hover {
+      // border: 1px solid $app-list-primary-color;
+    }
+
+    //属性框
+    .list-details {
+      flex: 1;
+      min-width: 280px;
+      height: 100%;
+      background-color: #fff;
+      padding: 12px 24px;
+      border: 1px solid #fff;
+      border-radius: 4px;
+      margin-left: 22px;
+      position: relative;
+
+      .title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        font-family: PingFangSC-Semibold;
+      }
+
+      // 属性框内容
+      .details-content-box {
+        width: 100%;
+        height: calc(100% - 86px);
+        // height: 200px;
+        overflow-y: auto;
+
+        .item-content {
+          font-size: 14px;
+          border-bottom: 1px solid rgba(231, 231, 231, 1);
+          color: rgba(0, 0, 0, 0.9);
+        }
+        .item-content-edit {
+          border: 0px;
+          border-bottom: 1px solid #fff;
+        }
+        .content-map-box{
+          position: absolute;
+          top: 45px;
+          right: 27px;
+          width: 300px;
+          height: 300px;
+          background: #fff;
+        }
+        .map-btn-box{
+          height: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          position: absolute;
+          top: 45px;
+          right: 27px;
+          background-color: #FFFFFF;
+          box-shadow: 0 6px 30px 5px rgba(0, 0, 0, .05), 0 16px 24px 2px rgba(0, 0, 0, .04), 0 8px 10px -5px rgba(0, 0, 0, .08);
+          // z-index: 1002;
+          .map-btn{
+            width: 40px;
+            height: 40px;
+            margin: 0 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            .img{
+              width: 100%;
+              height: 100%;
+            }
+            .img1{
+              width: 20px;
+              height: 20px;
+            }
+          }
+        }
+       
+      }
+
+      // 属性框底部按钮
+      .details-btn-box {
+        // height: 56px;
+        width: 100%;
+        margin-top: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        .btn-left {
+          display: flex;
+
+          .left-text {
+            color: #000000 90%;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 12px;
+          }
+          .left-text:hover{
+            color: #266FE8;
+          }
+
+          .left-text-no {
+            color: #999;
+            cursor: not-allowed;
+            margin-right: 10px;
+            font-size: 12px;
+          }
+        }
+
+        .btn-right {
+          display: flex;
+          align-items: center;
+
+          .right-text {
+            font-size: 12px;
+            color: #E34D59;
+            margin-right: 10px;
+            font-weight: 400;
+            cursor: pointer;
+            padding-top: 2px;
+          }
+          .right-text1 {
+            font-size: 12px;
+            margin-right: 10px;
+            font-weight: 400;
+            cursor: pointer;
+            padding-top: 2px;
+          }
+          .right-btn{
+            height: 24px;
+            font-size: 12px;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+        }
+      }
+    }
+
+    .list-details:hover {
+      // border: 1px solid $app-list-primary-color;
+    }
+  }
+
+  //这是弹窗的样式，新增，编辑，详情
+  .dialog-content-box {
+    width: 100%;
+    height: calc(100vh - 300px);
+    // height: 600px;
+    display: flex;
+    justify-content: space-between;
+
+    .dialog-content-left {
+      width: 60%;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 8px;
+
+      .item-content {
+        font-size: 14px;
+        // padding-bottom: 12px;
+        border-bottom: 1px solid rgba(231, 231, 231, 1);
+        color: rgba(0, 0, 0, 0.9);
+      }
+
+      .item-content-edit {
+        border: 0px;
+        border-bottom: 1px solid #fff;
+      }
+      
+    }
+
+    .dialog-content-right {
+      width: 100%;
+      height: 100%;
+      margin-left: 20px;
+    }
+  }
+
+  // 禁止选择文本
+  .not-select {
+    -moz-user-select: none;
+    /*狐*-webkit-user-select:none; /*webkit浏览器*/
+    -ms-user-select: none;
+    /*IE10*/
+    -khtml-user-select: none;
+    /*早期浏览器*/
+    user-select: none;
+  }
+
+  // 这些是图上上传相关的样式
+  .upload-img-box{
+    // 多选
+    display: flex;
+    flex-wrap: wrap;
+
+    .avatar-uploader-icon {
+      font-size: 28px;
+      color: #8c939d;
+      width: 100px;
+      height: 100px;
+      line-height: 100px;
+      border: 1px dashed #999;
+      text-align: center;
+      margin: 10px 0;
+    }
+    .avatar {
+      width: 100px;
+      height: 100px;
+      display: block;
+      margin-bottom: 10px;
+    }
+    .avatar-error {
+      width: 20px;
+      height: 20px;
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      font-size: 20px;
+      cursor: pointer;
+    }
+  }
+  .upload-img-box-details{
+    // 多选
+      display: flex;
+      flex-wrap: wrap;
+      .avatar {
+        width: 100px;
+        height: 100px;
+        display: block;
+        margin-bottom: 10px;
+      }
+      .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 2999;
+      }
+      .large-image {
+        max-width: 80%;
+        max-height: 80%;
+      }
+  }
+  //单选
+  .avatar-uploader-icon {
+    font-size: 28px;
+    color: #8c939d;
+    width: 100px;
+    height: 100px;
+    line-height: 100px;
+    border: 1px dashed #999;
+    text-align: center;
+  }
+  .avatar {
+    width: 100px;
+    height: 100px;
+    display: block;
+    margin-bottom: 10px;
+  }
+  .avatar-error {
+    width: 20px;
+    height: 20px;
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2999;
+  }
+  .large-image {
+    max-width: 80%;
+    max-height: 80%;
+  }
+}
+
+// 这个是筛选弹出框的样式，因为弹窗是创建在最外层，所以样式要写在外面
+.screen-list-box {
+  width: 100%;
+
+  .list-box-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 35px;
+    border-bottom: 1px solid #E7E7E7;
+
+    .icon {
+      width: 12px;
+      height: 13px;
+      cursor: pointer;
+    }
+  }
+
+  .list-box-check-box {
+    height: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    .list-box-check-item {
+      margin-top: 10px;
+      width: 100%;
+    }
+  }
+}
+
+// 新列表页引入的图标
+.el-icon-earth {
+  background: url("~@/static/templateImages/earth.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  right: 3px;
+  top: 2px;
+  width: 14px;
+  height: 14px;
+}
+
+.el-icon-morenew1 {
+  background: url("~@/static/templateImages/more.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  top: 1px;
+  left: 3px;
+  width: 2px;
+  height: 12px;
+}
+
+.el-icon-screen-cutting {
+  background: url("~@/static/templateImages/screen-cutting.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  top: -2px;
+  width: 14px;
+  height: 14px;
+}
+
+.el-icon-screen {
+  background: url("~@/static/templateImages/screen.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  top: -2px;
+  width: 13px;
+  height: 13px;
+}
+
+.el-icon-searchnew {
+  background: url("~@/static/templateImages/search.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  top: 3px;
+  width: 14px;
+  height: 16px;
+}
+
+.el-icon-resetnew {
+  background: url("~@/static/templateImages/reset.png") center no-repeat;
+  background-size: 100% 100%;
+  width: 12px;
+  height: 13px;
+}
+
+.el-icon-selectnew {
+  background: url("~@/static/templateImages/select.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  top: 2px;
+  left: 5px;
+  width: 12px;
+  height: 12px;
+}
+
+.el-icon-addnew {
+  background: url("~@/static/templateImages/add.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  // top: 2px;
+  right: 3px;
+  width: 10px;
+  height: 10px;
+}
+
+.el-icon-deletenew {
+  background: url("~@/static/templateImages/delete.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  top: 1px;
+  right: 3px;
+  width: 11px;
+  height: 13px;
+}
+
+.el-icon-importnew {
+  background: url("~@/static/templateImages/Import.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  top: 1px;
+  right: 3px;
+  width: 11px;
+  height: 12px;
+}
+
+.el-icon-exportnew {
+  background: url("~@/static/templateImages/export.png") center no-repeat;
+  background-size: 100% 100%;
+  position: relative;
+  top: 1px;
+  right: 3px;
+  width: 11px;
+  height: 12px;
+}
+
+//设置了表头行的高度
+.el-table th>.cell {
+  height: 34px;
+  line-height: 34px;
+
+}
+
+//表格选中行颜色
+.el-table__body tr.current-row>td {
+  background-color: #96aedd;
+
+}
+.el-table tbody tr:hover>td {
+  background-color: #c4c1c4e7 !important;
+}
+
+//设置表格单元格的高度
+.el-table--medium th {
+  padding: 6px 0;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: 400;
+}
+
+.el-table--medium td {
+  padding: 11px 0;
+  color: rgba(0, 0, 0, 0.9);
+  font-weight: 400;
+}
+
+//设置顶部路由导航
+.el-breadcrumb__inner.is-link,
+.el-breadcrumb__inner a {
+  color: rgba(0, 0, 0, 0.4) !important;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.app-breadcrumb.el-breadcrumb .no-redirect[data-v-b50ef614] {
+  color: rgba(0, 0, 0, 0.9) !important;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.c-click {
+  color: $app-list-primary-color;
+  cursor: pointer;
+}
+

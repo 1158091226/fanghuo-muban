@@ -1,0 +1,128 @@
+// cover some element-ui styles
+
+.el-breadcrumb__inner,
+.el-breadcrumb__inner a {
+  font-weight: 400 !important;
+}
+
+.el-upload {
+  input[type="file"] {
+    display: none !important;
+  }
+}
+
+.el-upload__input {
+  display: none;
+}
+
+.cell {
+  .el-tag {
+    margin-right: 0px;
+  }
+}
+
+.small-padding {
+  .cell {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+}
+
+.fixed-width {
+  .el-button--mini {
+    padding: 7px 10px;
+    min-width: 60px;
+  }
+}
+
+.status-col {
+  .cell {
+    padding: 0 10px;
+    text-align: center;
+
+    .el-tag {
+      margin-right: 0px;
+    }
+  }
+}
+
+// to fixed https://github.com/ElemeFE/element/issues/2461
+.el-dialog {
+  transform: none;
+  left: 0;
+  position: relative;
+  margin: 0 auto;
+  border-radius: 8px;
+}
+
+// refine element ui upload
+.upload-container {
+  .el-upload {
+    width: 100%;
+
+    .el-upload-dragger {
+      width: 100%;
+      height: 200px;
+    }
+  }
+}
+
+// dropdown
+.el-dropdown-menu {
+  a {
+    display: block
+  }
+}
+
+// fix date-picker ui bug in filter-item
+.el-range-editor.el-input__inner {
+  display: inline-flex !important;
+}
+
+// to fix el-date-picker css style
+.el-range-separator {
+  box-sizing: content-box;
+}
+
+// 数字输入框设置文字偏左
+.el-input-number .el-input__inner {
+  text-align: left;
+}
+
+// 弹框标题样式
+.el-dialog__title {
+  line-height: 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0,0,0,0.9);
+}
+// 弹框内容
+.el-dialog__body {
+  padding: 18px 20px;
+  color: #606266;
+  font-size: 14px;
+  word-break: break-all;
+}
+// 表单label样式
+.el-form-item__label{
+  color: rgba(0, 0, 0, 0.6);
+  font-weight:400;
+}
+// 表单的小星星
+.el-form-item.is-required:not(.is-no-asterisk)>.el-form-item__label:before,
+.el-form-item.is-required:not(.is-no-asterisk) .el-form-item__label-wrap>.el-form-item__label:before{
+  content: "";
+
+}
+.el-form-item.is-required:not(.is-no-asterisk)>.el-form-item__label:after,
+.el-form-item.is-required:not(.is-no-asterisk) .el-form-item__label-wrap>.el-form-item__label:after {
+  content: "*";
+  color: #E34D59;
+  // margin-left: 2px;
+  position: relative;
+  top: -3px;
+  left: 2px;
+  font-family: PingFangSC-Regular;
+  font-size: 14px;
+  font-weight: 400;
+}

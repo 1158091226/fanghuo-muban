@@ -442,7 +442,7 @@ import {
   legendGetColumnList,
   legendGetdataListByColumn,
   updateLegendlUpdate,
-  geoserverRefreshStyle,
+  // geoserverRefreshStyle,
   updateLegendlUpdateLabel,
   commonDownThumbnailload,
 } from "@/api/system";
@@ -753,17 +753,17 @@ export default {
           const tempData = Object.assign({}, this.item);
           if (this.item.parentId === -1) {
             updateLegendlUpdateLabel(tempData).then(() => {
-              geoserverRefreshStyle(this.item.id).then((res) => {
-                this.$emit("treeUpdateSuccess");
-                this.formVisible = false;
-              });
+              // geoserverRefreshStyle(this.item.id).then((res) => {
+              //   this.$emit("treeUpdateSuccess");
+              //   this.formVisible = false;
+              // });
             });
           } else {
             updateLegendlUpdate(tempData).then(() => {
-              geoserverRefreshStyle(this.item.id).then((res) => {
-                this.$emit("treeUpdateSuccess");
-                this.formVisible = false;
-              });
+              // geoserverRefreshStyle(this.item.id).then((res) => {
+              //   this.$emit("treeUpdateSuccess");
+              //   this.formVisible = false;
+              // });
             });
           }
         }

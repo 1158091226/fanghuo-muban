@@ -36,7 +36,7 @@ import {
   requestDate,
   imgUrl,
   fileType,
-  coverImgShow,
+  // coverImgShow,
   translate,
   tolerance,
   telEncryption
@@ -48,7 +48,7 @@ Vue.prototype.$date = date;
 Vue.prototype.$requestDate = requestDate;
 Vue.prototype.$imgUrl = imgUrl;
 Vue.prototype.$fileType = fileType;
-Vue.prototype.$coverImgShow = coverImgShow;
+// Vue.prototype.$coverImgShow = coverImgShow;
 Vue.prototype.$translate = translate;
 Vue.prototype.$tolerance = tolerance;
 Vue.prototype.$telEncryption = telEncryption;

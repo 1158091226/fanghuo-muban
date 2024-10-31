@@ -1,20 +1,19 @@
 "use strict";
 const path = require("path");
 const defaultSettings = require("./src/settings.js");
-
 function resolve(dir) {
   return path.join(__dirname, dir);
 }
-
 const name = defaultSettings.title || "vue Element Admin"; // page title
-
 // If your port is set to 80,
 // use administrator privileges to execute the command line.
 // For example, Mac: sudo npm run
 // You can change the port by the following method:
 // port = 9527 npm run dev OR npm run dev --port = 9527
 const port = process.env.port || process.env.npm_config_port || 9527; // dev port
-
+const SpeedMeasurePlugin = require("speed-measure-webpack-plugin"); //这个是用于在控制台展示编译时间的
+const smp = new SpeedMeasurePlugin(); //这个是用于在控制台展示编译时间的
+const HardSourceWebpackPlugin = require("hard-source-webpack-plugin"); //提供缓存，让项目在第二次编译的时候大大节省时间
 // All configuration item explanations can be find in https://cli.vuejs.org/config/
 module.exports = {
   /**
@@ -28,16 +27,15 @@ module.exports = {
   outputDir: "dist",
   assetsDir: "static",
   lintOnSave: process.env.NODE_ENV === "development",
-  productionSourceMap: false,
-  /* devServer: {
-      port: port,
-      open: true,
-      overlay: {
-          warnings: false,
-          errors: true
-      },
-      before: require('./mock/mock-server.js')
-  }, */
+  productionSourceMap: false /* devServer: {
+      port: port,
+      open: true,
+      overlay: {
+          warnings: false,
+          errors: true
+      },
+      before: require('./mock/mock-server.js')
+  }, */,
   devServer: {
     port: port,
     open: true,
@@ -52,14 +50,7 @@ module.exports = {
         pathRewrite: {
           ["^" + process.env.VUE_APP_BASE_API]: "",
         },
-      },
-      // "/forestry-basic-system": {
-      //   target: "http://192.168.3.11:8001/micro/forestry-basic-system",
-      //   changeOrigin: true,
-      //   pathRewrite: {
-      //     "/forestry-basic-system": "/",
-      //   },
-      // },
+      }, // "/forestry-basic-system": { //   target: "http://192.168.3.11:8001/micro/forestry-basic-system", //   changeOrigin: true, //   pathRewrite: { //     "/forestry-basic-system": "/", //   }, // },
       "/ceshi": {
         target: "http://192.168.3.11:8001/micro/",
         changeOrigin: true,
@@ -69,35 +60,73 @@ module.exports = {
       },
     },
   },
-  configureWebpack: {
-    // provide the app's title in webpack's name field, so that
-    // it can be accessed in index.html to inject the correct title.
-    // devtool: "source-map",
-    name: name,
-    resolve: {
-      alias: {
-        "@": resolve("src"),
-      },
-    },
+  configureWebpack: (conifg) => {
+    if (process.env.ENV !== "production") {
+      return smp.wrap({
+        // ...其他的webpack配置
+        name: name,
+        resolve: {
+          alias: {
+            "@": resolve("src"),
+          },
+        },
+        optimization: {
+          splitChunks: {
+            chunks: "all", // 代码拆分
+          },
+        },
+      });
+    } else {
+      return {
+        name: name,
+        resolve: {
+          alias: {
+            "@": resolve("src"),
+          },
+        },
+      };
+    }
   },
-
   chainWebpack(config) {
-    // it can improve the speed of the first screen, it is recommended to turn on preload
-    // it can improve the speed of the first screen, it is recommended to turn on preload
+    if (process.env.ENV !== "production") {
+      // config
+      //   .plugin("webpack-bundle-analyzer")
+      //   .use(require("webpack-bundle-analyzer").BundleAnalyzerPlugin)
+      //   .end(); // 针对 JavaScript 文件配置 thread-loader 和 cache-loader
+      config.module
+        .rule("js")
+        .use("cache-loader")
+        .loader("cache-loader")
+        .end()
+        .use("thread-loader")
+        .loader("thread-loader")
+        .options({
+          // 可以在这里配置 thread-loader 的选项
+          // workers: 2, // 指定线程数
+        })
+        .end(); // 针对 Vue 文件配置 thread-loader 和 cache-loader
+      config.module
+        .rule("vue")
+        .use("cache-loader")
+        .loader("cache-loader")
+        .end()
+        .use("thread-loader")
+        .loader("thread-loader")
+        .options({
+          // 可以在这里配置 thread-loader 的选项
+          // workers: 2, // 指定线程数
+        })
+        .end();
+      config.plugins.delete("prefetch");
+    } // it can improve the speed of the first screen, it is recommended to turn on preload // it can improve the speed of the first screen, it is recommended to turn on preload
     config.plugin("preload").tap(() => [
       {
-        rel: "preload",
-        // to ignore runtime.js
-        // https://github.com/vuejs/vue-cli/blob/dev/packages/@vue/cli-service/lib/config/app.js#L171
+        rel: "preload", // to ignore runtime.js // https://github.com/vuejs/vue-cli/blob/dev/packages/@vue/cli-service/lib/config/app.js#L171
         fileBlacklist: [/\.map$/, /hot-update\.js$/, /runtime\..*\.js$/],
         include: "initial",
       },
-    ]);
-
-    // when there are many pages, it will cause too many meaningless requests
-    config.plugins.delete("prefetch");
-
-    // set svg-sprite-loader
+    ]); // when there are many pages, it will cause too many meaningless requests
+    config.plugins.delete("prefetch"); // set svg-sprite-loader
     config.module.rule("svg").exclude.add(resolve("src/icons")).end();
     config.module
       .rule("icons")
@@ -157,14 +186,16 @@ module.exports = {
           commons: {
             name: "chunk-commons",
             test: resolve("src/components"), // can customize your rules
-            minChunks: 3, //  minimum common number
+            minChunks: 3, //  minimum common number
             priority: 5,
             reuseExistingChunk: true,
           },
         },
-      });
-      // https:// webpack.js.org/configuration/optimization/#optimizationruntimechunk
+      }); // https:// webpack.js.org/configuration/optimization/#optimizationruntimechunk
       config.optimization.runtimeChunk("single");
+    });
+    config.when(process.env.NODE_ENV == "development", (config) => {
+      // config.plugin("HardSourceWebpackPlugin").use(HardSourceWebpackPlugin); //这个就是是否要开启缓存，开启后虽说第二次启动项目更快了，但是热重载感觉却变慢了，就是保存后自动更新的功能。有点得不偿失，所以选择不开启缓存
     });
   },
 };

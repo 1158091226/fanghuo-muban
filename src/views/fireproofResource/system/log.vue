@@ -53,7 +53,6 @@
         <el-option label="异常" value="1" />
       </el-select>
       <el-button
-        v-waves
         class="filter-item"
         icon="el-icon-search"
         @click="handleFilter"
@@ -224,10 +223,9 @@
 </template>
 
 <script>
-import { deepClone } from '@/utils';
-import { fetchLogPage, fetchLogItem, fetchDictionaryList } from '@/api/system';
-import waves from '@/directive/waves';
-import Pagination from '@/components/Pagination';
+import { deepClone } from "@/utils";
+import { fetchLogPage, fetchLogItem, fetchDictionaryList } from "@/api/system";
+import Pagination from "@/components/Pagination";
 
 const itemDefault = {
   id: undefined,
@@ -243,12 +241,11 @@ const itemDefault = {
   operUrl: undefined,
   operParam: undefined,
   jsonResult: undefined,
-  errorMsg: undefined
+  errorMsg: undefined,
 };
 
 export default {
   components: { Pagination },
-  directives: { waves },
   filters: {},
   data() {
     return {
@@ -263,13 +260,13 @@ export default {
         operName: undefined,
         businessType: undefined,
         operatorType: undefined,
-        status: undefined
+        status: undefined,
       },
       businessTypes: [],
       businessTypeMap: {},
       operatorTypes: [],
       operatorTypeMap: [],
-      formVisible: false
+      formVisible: false,
     };
   },
   computed: {},
@@ -291,7 +288,7 @@ export default {
     // 获取业务类型列表
     async getBusinessTypes() {
       const query = {};
-      query.code = 'businessType';
+      query.code = "businessType";
       const res = await fetchDictionaryList(query);
       this.businessTypes = res.data;
       for (let i = 0; i < res.data.length; i++) {
@@ -302,7 +299,7 @@ export default {
     // 获取操作系统类型列表
     async getOperatorTypes() {
       const query = {};
-      query.code = 'operatorType';
+      query.code = "operatorType";
       const res = await fetchDictionaryList(query);
       this.operatorTypes = res.data;
       for (let i = 0; i < res.data.length; i++) {
@@ -325,19 +322,19 @@ export default {
     handleFilter() {
       this.query.pageNo = 1;
 
-      if (this.query.title === '') {
+      if (this.query.title === "") {
         delete this.query.title;
       }
-      if (this.query.operName === '') {
+      if (this.query.operName === "") {
         delete this.query.operName;
       }
-      if (this.query.businessType === '') {
+      if (this.query.businessType === "") {
         delete this.query.businessType;
       }
-      if (this.query.operatorType === '') {
+      if (this.query.operatorType === "") {
         delete this.query.operatorType;
       }
-      if (this.query.status === '') {
+      if (this.query.status === "") {
         delete this.query.status;
       }
 
@@ -350,8 +347,8 @@ export default {
       this.formVisible = true;
       this.getItem(scope.row.id);
       this.$nextTick(() => {});
-    }
-  }
+    },
+  },
 };
 </script>
 

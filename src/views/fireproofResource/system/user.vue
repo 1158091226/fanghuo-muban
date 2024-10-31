@@ -24,7 +24,6 @@
           @keyup.enter.native="handleFilter"
         />
         <el-button
-          v-waves
           class="filter-item mr-10"
           icon="el-icon-search"
           @click="handleFilter"
@@ -123,19 +122,23 @@
                 <el-dropdown-item
                   v-permission="[path + ':update-password']"
                   @click.native="handleUpdatePassword(scope)"
-                >修改密码</el-dropdown-item>
+                  >修改密码</el-dropdown-item
+                >
                 <el-dropdown-item
                   v-permission="[path + ':reset-password']"
                   @click.native="handleResetPassword(scope)"
-                >{{ $t("user.resetPassword") }}</el-dropdown-item>
+                  >{{ $t("user.resetPassword") }}</el-dropdown-item
+                >
                 <el-dropdown-item
                   v-permission="[path + ':unlock']"
                   @click.native="handleUnclock(scope)"
-                >解锁</el-dropdown-item>
+                  >解锁</el-dropdown-item
+                >
                 <el-dropdown-item
                   v-permission="[path + ':delete']"
                   @click.native="handleDelete(scope)"
-                >{{ $t("table.delete") }}</el-dropdown-item>
+                  >{{ $t("table.delete") }}</el-dropdown-item
+                >
               </el-dropdown-menu>
             </el-dropdown>
           </template>
@@ -314,63 +317,61 @@ import {
   updateUserItemPassword,
   resetUserListPassword,
   unlockUserItem,
-  fetchRoleList
-} from '@/api/system';
-import waves from '@/directive/waves';
-import Pagination from '@/components/Pagination';
-import AreaSelect from '@/components/AreaSelect';
-import UnitSelect from '@/components/UnitSelect';
-import md5 from 'js-md5';
-import { isArray } from '@/utils/validate';
-import { deepClone, permissionPath } from '@/utils';
+  fetchRoleList,
+} from "@/api/system";
+import Pagination from "@/components/Pagination";
+import AreaSelect from "@/components/AreaSelect";
+import UnitSelect from "@/components/UnitSelect";
+import md5 from "js-md5";
+import { isArray } from "@/utils/validate";
+import { deepClone, permissionPath } from "@/utils";
 
 const itemDefault = {
   id: undefined,
   account: undefined,
   nameCh: undefined,
-  areaCode: '',
+  areaCode: "",
   areaFullName: undefined,
-  bnCode: '',
+  bnCode: "",
   tel: undefined,
   email: undefined,
   remark: undefined,
-  userType: '1'
+  userType: "1",
 };
 
 const passwordFormDefault = {
   id: undefined,
-  password: '',
-  newPassword: '',
-  newPasswordRepeat: ''
+  password: "",
+  newPassword: "",
+  newPasswordRepeat: "",
 };
 
 export default {
   components: { AreaSelect, UnitSelect, Pagination },
-  directives: { waves },
   filters: {},
   data() {
     const validatePass = (rule, value, callback) => {
-      if (value === '') {
-        callback(new Error('请输入密码'));
+      if (value === "") {
+        callback(new Error("请输入密码"));
       } else {
-        if (this.passwordForm.newPassword !== '') {
-          this.$refs['passwordForm'].validateField('newPasswordRepeat');
+        if (this.passwordForm.newPassword !== "") {
+          this.$refs["passwordForm"].validateField("newPasswordRepeat");
         }
         callback();
       }
     };
     const validatePass2 = (rule, value, callback) => {
-      if (value === '') {
-        callback(new Error('请再次输入密码'));
+      if (value === "") {
+        callback(new Error("请再次输入密码"));
       } else if (value !== this.passwordForm.newPassword) {
-        callback(new Error('两次输入密码不一致!'));
+        callback(new Error("两次输入密码不一致!"));
       } else {
         callback();
       }
     };
     return {
       loading: true,
-      path: '',
+      path: "",
       item: {},
       list: [],
       roles: [],
@@ -381,52 +382,52 @@ export default {
         pageSize: 10,
         areaCode: undefined,
         account: undefined,
-        nameCh: undefined
+        nameCh: undefined,
       },
 
       dialogLoading: true, // 弹窗加载状态
 
       rolesProps: {
-        children: 'children',
-        label: 'roleName'
+        children: "children",
+        label: "roleName",
       },
       checkStrictly: false,
 
-      formState: '',
+      formState: "",
       formStateMap: {
-        update: '编辑',
-        create: '新增'
+        update: "编辑",
+        create: "新增",
       },
       formVisible: false,
 
       // 表单校验
       rules: {
         account: [
-          { required: true, message: '登录账号不能为空', trigger: 'blur' }
+          { required: true, message: "登录账号不能为空", trigger: "blur" },
         ],
         passWord: [
-          { required: true, message: '登录密码不能为空', trigger: 'blur' }
+          { required: true, message: "登录密码不能为空", trigger: "blur" },
         ],
         nameCh: [
-          { required: true, message: '用户名称不能为空', trigger: 'blur' }
+          { required: true, message: "用户名称不能为空", trigger: "blur" },
         ],
         areaCode: [
-          { required: true, message: '请选择所属区划', trigger: 'change' }
+          { required: true, message: "请选择所属区划", trigger: "change" },
         ],
         bnCode: [
-          { required: true, message: '请选择经营单位', trigger: 'change' }
-        ]
+          { required: true, message: "请选择经营单位", trigger: "change" },
+        ],
       },
 
       passwordVisible: false,
       passwordForm: {},
       passwordRules: {
         password: [
-          { required: true, message: '请输入原密码', trigger: 'blur' }
+          { required: true, message: "请输入原密码", trigger: "blur" },
         ],
-        newPassword: [{ validator: validatePass, trigger: 'blur' }],
-        newPasswordRepeat: [{ validator: validatePass2, trigger: 'blur' }]
-      }
+        newPassword: [{ validator: validatePass, trigger: "blur" }],
+        newPasswordRepeat: [{ validator: validatePass2, trigger: "blur" }],
+      },
     };
   },
   computed: {},
@@ -457,20 +458,20 @@ export default {
       res.data.forEach((v, k) => {
         if (
           level === 3 &&
-          v.roleCode !== 'admin' &&
-          v.roleCode !== 'province' &&
-          v.roleCode !== 'city'
+          v.roleCode !== "admin" &&
+          v.roleCode !== "province" &&
+          v.roleCode !== "city"
         ) {
           this.roles.push(v);
         }
         if (
           level === 2 &&
-          v.roleCode !== 'admin' &&
-          v.roleCode !== 'province'
+          v.roleCode !== "admin" &&
+          v.roleCode !== "province"
         ) {
           this.roles.push(v);
         }
-        if (level === 1 && v.roleCode !== 'admin') {
+        if (level === 1 && v.roleCode !== "admin") {
           this.roles.push(v);
         }
       });
@@ -485,14 +486,14 @@ export default {
         for (const k in this.item) {
           if (
             !this.item[k] &&
-            typeof this.item[k] !== 'undefined' &&
+            typeof this.item[k] !== "undefined" &&
             this.item[k] !== 0
           ) {
-            this.item[k] = '';
+            this.item[k] = "";
           }
         }
 
-        if (callback && typeof callback === 'function') {
+        if (callback && typeof callback === "function") {
           callback();
         }
       });
@@ -519,17 +520,17 @@ export default {
     // 搜索
     handleFilter() {
       this.query.pageNo = 1;
-      const temp = deepClone(this.$refs['area-filter'].codes);
+      const temp = deepClone(this.$refs["area-filter"].codes);
       if (isArray(temp) && temp.length > 0) {
         this.query.areaCode = temp.pop();
       } else {
         delete this.query.areaCode;
       }
 
-      if (this.query.account === '') {
+      if (this.query.account === "") {
         delete this.query.account;
       }
-      if (this.query.nameCh === '') {
+      if (this.query.nameCh === "") {
         delete this.query.nameCh;
       }
 
@@ -541,7 +542,7 @@ export default {
       if (isArray(temp) && temp.length > 0) {
         this.item.areaCode = temp.pop();
       } else {
-        this.item.areaCode = '';
+        this.item.areaCode = "";
       }
     },
 
@@ -550,25 +551,25 @@ export default {
       if (isArray(temp) && temp.length > 0) {
         this.item.bnCode = temp.pop();
       } else {
-        this.item.bnCode = '';
+        this.item.bnCode = "";
       }
     },
 
     // 新增
     handleCreate() {
       this.resetItem();
-      this.formState = 'create';
+      this.formState = "create";
       this.formVisible = true;
       this.dialogLoading = true;
       this.$nextTick(() => {
-        this.$refs['form'].clearValidate();
+        this.$refs["form"].clearValidate();
         this.dialogLoading = false;
       });
     },
 
     // 新增数据
     createData() {
-      this.$refs['form'].validate((valid) => {
+      this.$refs["form"].validate((valid) => {
         if (valid) {
           this.dialogLoading = true;
           this.item.roleIds = this.getRoleAllCheckedKeys();
@@ -582,10 +583,10 @@ export default {
               this.formVisible = false;
               this.dialogLoading = false;
               this.$notify({
-                title: '成功',
-                message: '创建成功',
-                type: 'success',
-                duration: 2000
+                title: "成功",
+                message: "创建成功",
+                type: "success",
+                duration: 2000,
               });
             })
             .catch((err) => {
@@ -599,15 +600,15 @@ export default {
     // 更新
     handleUpdate(scope) {
       this.resetItem();
-      this.formState = 'update';
+      this.formState = "update";
       this.formVisible = true;
       this.dialogLoading = true;
       this.checkStrictly = true;
 
-      this.getItem(scope.row.id, function() {});
+      this.getItem(scope.row.id, function () {});
 
       this.$nextTick(() => {
-        this.$refs['form'].clearValidate();
+        this.$refs["form"].clearValidate();
         fetchUserRoleList(scope.row.id).then((response) => {
           const checkedKeys = response.data.checkedKeys;
           checkedKeys.forEach((v) => {
@@ -623,7 +624,7 @@ export default {
 
     // 更新数据
     updateData() {
-      this.$refs['form'].validate((valid) => {
+      this.$refs["form"].validate((valid) => {
         if (valid) {
           this.dialogLoading = true;
           this.item.roleIds = this.getRoleAllCheckedKeys();
@@ -638,10 +639,10 @@ export default {
             this.formVisible = false;
             this.dialogLoading = false;
             this.$notify({
-              title: '成功',
-              message: '更新成功',
-              type: 'success',
-              duration: 2000
+              title: "成功",
+              message: "更新成功",
+              type: "success",
+              duration: 2000,
             });
           });
         }
@@ -650,19 +651,19 @@ export default {
 
     // 删除
     handleDelete({ $index, row }) {
-      this.$confirm('确定删除用户 “' + row.nameCh + '” ？', '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
+      this.$confirm("确定删除用户 “" + row.nameCh + "” ？", "警告", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
       })
-        .then(async() => {
+        .then(async () => {
           await deleteUserItem(row.id);
           this.list.splice($index, 1);
           this.$notify({
-            title: '成功',
-            message: '删除成功',
-            type: 'success',
-            duration: 2000
+            title: "成功",
+            message: "删除成功",
+            type: "success",
+            duration: 2000,
           });
         })
         .catch((err) => {
@@ -671,19 +672,19 @@ export default {
     },
 
     handleResetPassword({ $index, row }) {
-      this.$confirm('确定重置用户 “' + row.nameCh + '” 的密码？', '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
+      this.$confirm("确定重置用户 “" + row.nameCh + "” 的密码？", "警告", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
       })
-        .then(async() => {
+        .then(async () => {
           const data = [];
           data.push(row.id);
           await resetUserListPassword(data);
-          this.$confirm('新密码为：Aa!12345', '重置成功', {
-            confirmButtonText: '知道了',
+          this.$confirm("新密码为：Aa!12345", "重置成功", {
+            confirmButtonText: "知道了",
             showCancelButton: false,
-            type: 'success'
+            type: "success",
           });
         })
         .catch((err) => {
@@ -698,30 +699,30 @@ export default {
       this.dialogLoading = true;
 
       this.$nextTick(() => {
-        this.$refs['passwordForm'].clearValidate();
+        this.$refs["passwordForm"].clearValidate();
         this.dialogLoading = false;
       });
     },
 
     handleUnclock({ $index, row }) {
       this.$confirm(
-        '用户 “' + row.nameCh + '”已输入密码错误3次，确定进行解锁？',
-        '警告',
+        "用户 “" + row.nameCh + "”已输入密码错误3次，确定进行解锁？",
+        "警告",
         {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "warning",
         }
       )
-        .then(async() => {
+        .then(async () => {
           const data = {};
           data.userId = row.id;
           await unlockUserItem(data);
           this.$notify({
-            title: '成功',
-            message: '解锁成功',
-            type: 'success',
-            duration: 2000
+            title: "成功",
+            message: "解锁成功",
+            type: "success",
+            duration: 2000,
           });
         })
         .catch((err) => {
@@ -731,7 +732,7 @@ export default {
 
     // 新增数据
     submitPassword() {
-      this.$refs['passwordForm'].validate((valid) => {
+      this.$refs["passwordForm"].validate((valid) => {
         if (valid) {
           this.dialogLoading = true;
           const temp = {};
@@ -749,10 +750,10 @@ export default {
                 this.passwordVisible = false;
                 this.dialogLoading = false;
                 this.$notify({
-                  title: '成功',
-                  message: '修改成功',
-                  type: 'success',
-                  duration: 2000
+                  title: "成功",
+                  message: "修改成功",
+                  type: "success",
+                  duration: 2000,
                 });
                 return;
               }
@@ -762,8 +763,8 @@ export default {
             });
         }
       });
-    }
-  }
+    },
+  },
 };
 </script>
 

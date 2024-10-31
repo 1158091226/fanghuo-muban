@@ -16,7 +16,6 @@
         @keyup.enter.native="handleFilter"
       />
       <el-button
-        v-waves
         class="filter-item"
         icon="el-icon-search"
         @click="handleFilter"
@@ -80,14 +79,12 @@
 </template>
 
 <script>
-import { fetchAreaPage } from '@/api/system';
-import { deepClone } from '@/utils';
-import waves from '@/directive/waves';
-import Pagination from '@/components/Pagination';
+import { fetchAreaPage } from "@/api/system";
+import { deepClone } from "@/utils";
+import Pagination from "@/components/Pagination";
 
 export default {
   components: { Pagination },
-  directives: { waves },
   filters: {},
   data() {
     return {
@@ -98,8 +95,8 @@ export default {
         pageNo: 1,
         pageSize: 10,
         areaCode: undefined,
-        areaName: undefined
-      }
+        areaName: undefined,
+      },
     };
   },
   created() {
@@ -119,18 +116,18 @@ export default {
     handleFilter() {
       this.query.pageNo = 1;
 
-      if (this.query.areaCode === '') {
+      if (this.query.areaCode === "") {
         delete this.query.areaCode;
       }
-      if (this.query.areaName === '') {
+      if (this.query.areaName === "") {
         delete this.query.areaName;
       }
 
       this.getList();
     },
 
-    handleImport() {}
-  }
+    handleImport() {},
+  },
 };
 </script>
 

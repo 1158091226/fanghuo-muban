@@ -900,7 +900,6 @@ import {
   layersDescribeApi,
   commonDownThumbnailload,
 } from "@/api/system";
-import waves from "@/directive/waves"; // waves directive
 import Treeselect from "@riophae/vue-treeselect";
 import "@riophae/vue-treeselect/dist/vue-treeselect.css";
 
@@ -943,7 +942,6 @@ export default {
   components: {
     Treeselect,
   },
-  directives: { waves },
   filters: {},
   data() {
     const sqlFiltervalidator = (rule, value, callback) => {

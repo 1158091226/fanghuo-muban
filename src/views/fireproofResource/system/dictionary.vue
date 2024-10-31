@@ -9,7 +9,6 @@
         @keyup.enter.native="handleFilter"
       />
       <el-button
-        v-waves
         class="filter-item mr-10"
         icon="el-icon-search"
         @click="handleFilter"
@@ -158,13 +157,12 @@ import {
   fetchDictionaryItem,
   createDictionaryItem,
   updateDictionaryItem,
-  deleteDictionaryList
-} from '@/api/system';
-import waves from '@/directive/waves';
-import Pagination from '@/components/Pagination';
-import Treeselect from '@riophae/vue-treeselect';
-import '@riophae/vue-treeselect/dist/vue-treeselect.css';
-import { deepClone, permissionPath } from '@/utils';
+  deleteDictionaryList,
+} from "@/api/system";
+import Pagination from "@/components/Pagination";
+import Treeselect from "@riophae/vue-treeselect";
+import "@riophae/vue-treeselect/dist/vue-treeselect.css";
+import { deepClone, permissionPath } from "@/utils";
 
 const itemDefault = {
   id: undefined,
@@ -173,17 +171,16 @@ const itemDefault = {
   describe: undefined,
   sorting: 0,
   parentId: 0,
-  parentCode: '0'
+  parentCode: "0",
 };
 
 export default {
   components: { Pagination, Treeselect },
-  directives: { waves },
   filters: {},
   data() {
     return {
       loading: true,
-      path: '',
+      path: "",
       item: {},
       list: [],
       dictionaries: [],
@@ -191,29 +188,29 @@ export default {
       query: {
         pageNo: 1,
         pageSize: 10,
-        name: undefined
+        name: undefined,
       },
 
       dialogLoading: true, // 弹窗加载状态
 
-      formState: '',
+      formState: "",
       formStateMap: {
-        update: '编辑',
-        create: '新增'
+        update: "编辑",
+        create: "新增",
       },
       formVisible: false,
 
       // 表单校验
       rules: {
         name: [
-          { required: true, message: '字典名称不能为空', trigger: 'blur' }
+          { required: true, message: "字典名称不能为空", trigger: "blur" },
         ],
         code: [
-          { required: true, message: '字典编号不能为空', trigger: 'blur' }
-        ]
+          { required: true, message: "字典编号不能为空", trigger: "blur" },
+        ],
       },
 
-      listChildren: new Map()
+      listChildren: new Map(),
     };
   },
   computed: {},
@@ -230,7 +227,7 @@ export default {
       return {
         id: node.code,
         label: node.name,
-        children: node.children
+        children: node.children,
       };
     },
     getList() {
@@ -262,8 +259,8 @@ export default {
     /** 查询菜单下拉树结构 */
     getTreeselect() {
       this.dictionaries = [];
-      const menu = { code: '0', name: '主字典', children: [] };
-      menu.children = this.handleTree(this.list, 'code');
+      const menu = { code: "0", name: "主字典", children: [] };
+      menu.children = this.handleTree(this.list, "code");
       this.dictionaries.push(menu);
       /* console.log(this.dictionaries) */
     },
@@ -295,7 +292,7 @@ export default {
     handleFilter() {
       this.query.pageNo = 1;
 
-      if (this.query.name === '') {
+      if (this.query.name === "") {
         delete this.query.name;
       }
 
@@ -321,24 +318,24 @@ export default {
 
       this.getTreeselect();
 
-      this.formState = 'create';
+      this.formState = "create";
       this.formVisible = true;
       this.dialogLoading = true;
       this.$nextTick(() => {
-        this.$refs['form'].clearValidate();
+        this.$refs["form"].clearValidate();
         this.dialogLoading = false;
       });
     },
 
     // 新增数据
     createData() {
-      this.$refs['form'].validate((valid) => {
+      this.$refs["form"].validate((valid) => {
         /* console.log(this.item)
         return */
         if (valid) {
           this.dialogLoading = true;
           createDictionaryItem(this.item).then((response) => {
-            if (this.item.parentCode !== '0') {
+            if (this.item.parentCode !== "0") {
               this.updateChildrenList(this.item);
             } else {
               this.item.id = response.data;
@@ -349,10 +346,10 @@ export default {
             this.formVisible = false;
             this.dialogLoading = false;
             this.$notify({
-              title: '成功',
-              message: '创建成功',
-              type: 'success',
-              duration: 2000
+              title: "成功",
+              message: "创建成功",
+              type: "success",
+              duration: 2000,
             });
           });
         }
@@ -363,26 +360,26 @@ export default {
     handleUpdate(scope) {
       this.resetItem();
       this.getTreeselect();
-      this.formState = 'update';
+      this.formState = "update";
       this.formVisible = true;
       this.dialogLoading = true;
       this.item = deepClone(scope.row);
       this.getItem();
       this.$nextTick(() => {
-        this.$refs['form'].clearValidate();
+        this.$refs["form"].clearValidate();
         this.dialogLoading = false;
       });
     },
 
     // 更新数据
     updateData() {
-      this.$refs['form'].validate((valid) => {
+      this.$refs["form"].validate((valid) => {
         if (valid) {
           /* console.log(this.item)
           return */
           this.dialogLoading = true;
           updateDictionaryItem(this.item).then(() => {
-            if (this.item.parentCode !== '0') {
+            if (this.item.parentCode !== "0") {
               this.updateChildrenList(this.item);
             } else {
               const k = this.list.findIndex((v) => v.id === this.item.id);
@@ -392,10 +389,10 @@ export default {
             this.formVisible = false;
             this.dialogLoading = false;
             this.$notify({
-              title: '成功',
-              message: '更新成功',
-              type: 'success',
-              duration: 2000
+              title: "成功",
+              message: "更新成功",
+              type: "success",
+              duration: 2000,
             });
           });
         }
@@ -404,34 +401,34 @@ export default {
 
     // 删除
     handleDelete({ $index, row }) {
-      this.$confirm('确认删除该字典？', '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
+      this.$confirm("确认删除该字典？", "警告", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
       })
-        .then(async() => {
+        .then(async () => {
           const ids = [];
           ids.push(row.id);
           await deleteDictionaryList(ids);
 
-          if (row.parentCode !== '0') {
+          if (row.parentCode !== "0") {
             this.updateChildrenList(row);
           } else {
             this.list.splice($index, 1);
           }
 
           this.$notify({
-            title: '成功',
-            message: '删除成功',
-            type: 'success',
-            duration: 2000
+            title: "成功",
+            message: "删除成功",
+            type: "success",
+            duration: 2000,
           });
         })
         .catch((err) => {
           console.error(err);
         });
-    }
-  }
+    },
+  },
 };
 </script>
 

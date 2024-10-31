@@ -395,7 +395,6 @@ import {
 } from "@/api/system";
 // import api from '@/api/forestpatrol';
 // import { getMasterList } from '@/api/auth';
-import waves from "@/directive/waves";
 import Pagination from "@/components/Pagination";
 import { deepClone, permissionPath, dictLookup } from "@/utils";
 
@@ -439,7 +438,6 @@ const itemDefault = {
 
 export default {
   components: { Pagination },
-  directives: { waves },
   filters: {},
   data() {
     const validator1 = (rule, value, callback) => {

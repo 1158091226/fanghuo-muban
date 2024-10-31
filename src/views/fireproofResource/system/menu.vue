@@ -23,7 +23,6 @@
         />
       </el-select>
       <el-button
-        v-waves
         class="filter-item ml-10"
         icon="el-icon-search"
         @click="handleFilter"
@@ -34,7 +33,8 @@
         class="filter-item ml-10"
         icon="el-icon-sort"
         @click="toggleExpandAll"
-      >{{ !isExpandAll ? "展开" : "折叠" }}</el-button>
+        >{{ !isExpandAll ? "展开" : "折叠" }}</el-button
+      >
       <div class="fr" />
       <el-button
         v-permission="[path + ':create']"
@@ -124,7 +124,6 @@
       >
         <template slot-scope="scope">
           <el-button
-            v-waves
             v-permission="[path + ':update']"
             type="primary"
             size="mini"
@@ -315,7 +314,7 @@
               />
               <span slot="label">
                 <el-tooltip
-                  content="访问路由的默认传递参数，如：`{&quot;id&quot;: 1, &quot;name&quot;: &quot;ry&quot;}`"
+                  content='访问路由的默认传递参数，如：`{"id": 1, "name": "ry"}`'
                   placement="top"
                 >
                   <i class="el-icon-question" />
@@ -401,79 +400,77 @@ import {
   fetchMenuItem,
   createMenuItem,
   updateMenuItem,
-  deleteMenuItem
-} from '@/api/system';
-import waves from '@/directive/waves'; // waves directive
-import IconSelect from '@/components/IconSelect';
-import Treeselect from '@riophae/vue-treeselect';
-import '@riophae/vue-treeselect/dist/vue-treeselect.css';
-import { deepClone, permissionPath } from '@/utils';
+  deleteMenuItem,
+} from "@/api/system";
+import IconSelect from "@/components/IconSelect";
+import Treeselect from "@riophae/vue-treeselect";
+import "@riophae/vue-treeselect/dist/vue-treeselect.css";
+import { deepClone, permissionPath } from "@/utils";
 
 const itemDefault = {
   id: undefined,
   parentId: 0,
   menuName: undefined,
   icon: undefined,
-  menuType: 'M',
+  menuType: "M",
   orderNum: 1,
-  isFrame: '1',
-  isCache: '0',
-  visible: '0',
-  status: '0'
+  isFrame: "1",
+  isCache: "0",
+  visible: "0",
+  status: "0",
 };
 
 export default {
   components: {
     Treeselect,
-    IconSelect
+    IconSelect,
   },
-  directives: { waves },
   filters: {},
   data() {
     return {
       listKey: 0,
       list: [],
       loading: true,
-      path: '',
+      path: "",
       query: {
         menuName: undefined,
-        status: undefined
+        status: undefined,
       },
       item: {},
 
       dialogLoading: true, // 弹窗加载状态
 
       formVisible: false,
-      formStateMap: '',
+      formStateMap: "",
       deleteVisible: false,
       textMap: {
-        update: '编辑',
-        create: '新增'
+        update: "编辑",
+        create: "新增",
       },
       rules: {
         menuName: [
-          { required: true, message: '菜单名称不能为空', trigger: 'blur' }
+          { required: true, message: "菜单名称不能为空", trigger: "blur" },
         ],
         orderNum: [
-          { required: true, message: '菜单顺序不能为空', trigger: 'blur' }
+          { required: true, message: "菜单顺序不能为空", trigger: "blur" },
         ],
         path: [
-          { required: true, message: '路由地址不能为空', trigger: 'blur' }
-        ]
+          { required: true, message: "路由地址不能为空", trigger: "blur" },
+        ],
       },
       statusMap: [
-        { key: '0', value: '启用' },
-        { key: '1', value: '禁用' }
+        { key: "0", value: "启用" },
+        { key: "1", value: "禁用" },
       ],
       visibleMap: [
-        { key: '0', value: '显示' },
-        { key: '1', value: '隐藏' }
+        { key: "0", value: "显示" },
+        { key: "1", value: "隐藏" },
       ],
       menuMap: [],
       // 是否展开，默认全部折叠
       isExpandAll: false,
       // 重新渲染表格状态
-      listRefresh: true
+      listRefresh: true,
     };
   },
   created() {
@@ -503,7 +500,7 @@ export default {
       return {
         id: node.id,
         label: node.menuName,
-        children: node.children
+        children: node.children,
       };
     },
 
@@ -511,8 +508,8 @@ export default {
     getTreeselect() {
       fetchMenuList(this.listQuery).then((response) => {
         this.menuMap = [];
-        const menu = { id: 0, menuName: '主类目', children: [] };
-        menu.children = this.handleTree(response.data, 'id');
+        const menu = { id: 0, menuName: "主类目", children: [] };
+        menu.children = this.handleTree(response.data, "id");
         this.menuMap.push(menu);
       });
     },
@@ -522,7 +519,7 @@ export default {
       if (!key) {
         return;
       }
-      const value = 'table.' + key;
+      const value = "table." + key;
       return this.$t(value);
     },
 
@@ -530,7 +527,7 @@ export default {
       this.loading = true;
       fetchMenuList(this.query).then((response) => {
         this.list = response.data;
-        this.list = this.handleTree(response.data, 'id');
+        this.list = this.handleTree(response.data, "id");
         this.loading = false;
       });
     },
@@ -542,10 +539,10 @@ export default {
     },
 
     handleFilter() {
-      if (this.query.menuName === '') {
+      if (this.query.menuName === "") {
         delete this.query.menuName;
       }
-      if (this.query.status === '') {
+      if (this.query.status === "") {
         delete this.query.status;
       }
 
@@ -560,26 +557,26 @@ export default {
       temp.status = row.status;
       updateMenuItem(temp).then(() => {
         this.$notify({
-          title: '成功',
-          message: '更新成功',
-          type: 'success',
-          duration: 2000
+          title: "成功",
+          message: "更新成功",
+          type: "success",
+          duration: 2000,
         });
       });
     },
     handleCreate() {
       this.resetItem();
       this.getTreeselect();
-      this.formStateMap = 'create';
+      this.formStateMap = "create";
       this.formVisible = true;
       this.dialogLoading = true;
       this.$nextTick(() => {
-        this.$refs['form'].clearValidate();
+        this.$refs["form"].clearValidate();
         this.dialogLoading = false;
       });
     },
     createData() {
-      this.$refs['form'].validate((valid) => {
+      this.$refs["form"].validate((valid) => {
         if (valid) {
           this.dialogLoading = true;
           createMenuItem(this.item).then((response) => {
@@ -587,10 +584,10 @@ export default {
             this.formVisible = false;
             this.dialogLoading = false;
             this.$notify({
-              title: '成功',
-              message: '创建成功',
-              type: 'success',
-              duration: 2000
+              title: "成功",
+              message: "创建成功",
+              type: "success",
+              duration: 2000,
             });
           });
         }
@@ -601,17 +598,17 @@ export default {
       this.getTreeselect();
       this.item = Object.assign({}, scope.row);
       this.getItem(scope.row.id);
-      this.formStateMap = 'update';
+      this.formStateMap = "update";
       this.formVisible = true;
       this.dialogLoading = true;
       this.$nextTick(() => {
-        this.$refs['form'].clearValidate();
+        this.$refs["form"].clearValidate();
         this.dialogLoading = false;
       });
     },
 
     updateData() {
-      this.$refs['form'].validate((valid) => {
+      this.$refs["form"].validate((valid) => {
         if (valid) {
           this.dialogLoading = true;
           const tempData = Object.assign({}, this.item);
@@ -620,10 +617,10 @@ export default {
             this.formVisible = false;
             this.dialogLoading = false;
             this.$notify({
-              title: '成功',
-              message: '更新成功',
-              type: 'success',
-              duration: 2000
+              title: "成功",
+              message: "更新成功",
+              type: "success",
+              duration: 2000,
             });
           });
         }
@@ -631,29 +628,29 @@ export default {
     },
 
     handleDelete(scope) {
-      this.$confirm('确认删除该菜单？', '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        confirmButtonType: '',
-        type: 'warning'
+      this.$confirm("确认删除该菜单？", "警告", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        confirmButtonType: "",
+        type: "warning",
       })
-        .then(async() => {
+        .then(async () => {
           /* const data = {}
           data.ids = scope.row.id */
           await deleteMenuItem(scope.row.id);
           this.getList();
           this.$notify({
-            title: '成功',
-            message: '删除成功',
-            type: 'success',
-            duration: 2000
+            title: "成功",
+            message: "删除成功",
+            type: "success",
+            duration: 2000,
           });
         })
         .catch(() => {
           // console.error(err)
         });
-    }
-  }
+    },
+  },
 };
 </script>
 

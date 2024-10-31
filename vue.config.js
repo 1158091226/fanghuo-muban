@@ -89,10 +89,10 @@ module.exports = {
   },
   chainWebpack(config) {
     if (process.env.ENV !== "production") {
-      // config
-      //   .plugin("webpack-bundle-analyzer")
-      //   .use(require("webpack-bundle-analyzer").BundleAnalyzerPlugin)
-      //   .end(); // 针对 JavaScript 文件配置 thread-loader 和 cache-loader
+      config
+        .plugin("webpack-bundle-analyzer")
+        .use(require("webpack-bundle-analyzer").BundleAnalyzerPlugin)
+        .end(); // 针对 JavaScript 文件配置 thread-loader 和 cache-loader
       config.module
         .rule("js")
         .use("cache-loader")

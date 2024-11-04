@@ -9,7 +9,7 @@ const service = axios.create({
   // withCredentials: true, // send cookies when cross-domain requests
   timeout: 500000, // request timeout
 });
-
+let requestCount = 0;
 // request interceptor
 service.interceptors.request.use(
   (config) => {
@@ -22,7 +22,12 @@ service.interceptors.request.use(
       config.headers["token"] = getToken();
     }
     // 控制是否开启遮罩层
-    store.dispatch("app/setRequestLoading", !!config.isRequest);
+    if (config.isRequest) {
+      requestCount++;
+      store.dispatch("app/setRequestLoading", true);
+    } else {
+      // store.dispatch("app/setRequestLoading", false);
+    }
     return config;
   },
   (error) => {
@@ -79,7 +84,14 @@ service.interceptors.response.use(
 
     // 存在直接返回，不拦截
     if (types.indexOf(type) != -1) {
-      store.dispatch("app/setRequestLoading", false);
+      if (response.config.isRequest) {
+        requestCount--;
+        if (requestCount === 0) {
+          // 关闭遮罩层的逻辑
+          store.dispatch("app/setRequestLoading", false);
+        }
+      }
+
       const fileName =
         response.headers["content-disposition"] ||
         response.headers["Content-Disposition"];
@@ -113,7 +125,6 @@ service.interceptors.response.use(
           }
         ).then(() => {
           store.dispatch("user/resetToken").then(() => {
-            store.dispatch("app/setRequestLoading", false);
             location.reload();
           });
         });
@@ -125,7 +136,6 @@ service.interceptors.response.use(
           duration: 5 * 1000,
         });
       } else {
-        store.dispatch("app/setRequestLoading", false);
         Message({
           message: res.message,
           // message: res.code !== '999' ? res.message : '异常错误' || 'Error',
@@ -133,15 +143,33 @@ service.interceptors.response.use(
           duration: 5 * 1000,
         });
       }
-      store.dispatch("app/setRequestLoading", false);
+      if (response.config.isRequest) {
+        requestCount--;
+        if (requestCount === 0) {
+          // 关闭遮罩层的逻辑
+          store.dispatch("app/setRequestLoading", false);
+        }
+      }
       return Promise.reject(new Error(res.message || "Error"));
     } else {
-      store.dispatch("app/setRequestLoading", false);
+      if (response.config.isRequest) {
+        requestCount--;
+        if (requestCount === 0) {
+          // 关闭遮罩层的逻辑
+          store.dispatch("app/setRequestLoading", false);
+        }
+      }
       return res;
     }
   },
   (error) => {
-    store.dispatch("app/setRequestLoading", false);
+    if (response.config.isRequest) {
+      requestCount--;
+      if (requestCount === 0) {
+        // 关闭遮罩层的逻辑
+        store.dispatch("app/setRequestLoading", false);
+      }
+    }
     // console.log('err' + error); // for debug
     Message({
       // message: error.message,

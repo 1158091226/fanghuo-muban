@@ -51,6 +51,7 @@ export function fetchMenuTree() {
   return request({
     url: "/sys/menuh/tree",
     method: "get",
+    isRequest: true,
   });
 }
 // 林草系统管理-图层管理-查询对应角色
@@ -110,6 +111,7 @@ export function fetchRoleList(query) {
     url: "/sys/role/findAll",
     method: "get",
     params: query,
+    isRequest: true,
   });
 }
 

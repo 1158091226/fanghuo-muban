@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container">
+  <div class="app-container" v-loading="requestLoading">
     <div class="filter-container clearfix">
       <div class="fl">
         <el-input
@@ -30,7 +30,6 @@
     </div>
 
     <el-table
-      v-loading="loading"
       :data="list"
       border
       fit
@@ -137,6 +136,7 @@ import {
   deleteRoleItem,
 } from "@/api/system";
 import { deepClone, permissionPath } from "@/utils";
+import { mapGetters } from "vuex";
 
 const itemDefault = {
   id: undefined,
@@ -183,7 +183,9 @@ export default {
       },
     };
   },
-  computed: {},
+  computed: {
+    ...mapGetters(["requestLoading"]),
+  },
   created() {
     this.path = permissionPath(this.$route.path);
     this.getList();

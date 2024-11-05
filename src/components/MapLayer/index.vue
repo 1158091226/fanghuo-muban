@@ -1,6 +1,82 @@
 <template>
-  <div ref="mapBasis" class="map-layer map-basis" :style="{ height: height }">
+  <div class="map-layer" :style="{ height: height }">
     <div :id="id" ref="rootmap" class="map-panel" style="height: 100%" />
+    <!-- 搜索框 -->
+    <div class="map-search-box" v-if="searchForm">
+      <el-select
+        class="chose-type"
+        placeholder="类型"
+        v-model="searchForm.searchType"
+        size="small"
+      >
+        <el-option label="坐标" :value="undefined"></el-option>
+        <el-option label="地址" :value="1"></el-option>
+        <el-option label="区划" :value="2"></el-option>
+      </el-select>
+      <div class="map-box-right">
+        <div v-if="searchForm.searchType == 1">
+          <el-select
+            v-model="searchAreaName"
+            filterable
+            remote
+            reserve-keyword
+            placeholder="请输入区划名称"
+            :remote-method="getAreaList"
+            :loading="loading"
+            clearable
+          >
+            <el-option
+              v-for="item in backAreaList"
+              :key="item.areaCode"
+              :label="item.areaName"
+              :value="item.areaCode"
+              @click.native="getAreaDetail(item)"
+              @keyup.enter.native="getAreaDetail(item)"
+            />
+          </el-select>
+          <!-- <el-button type="primary" size="small" class="ml-10">查询</el-button> -->
+        </div>
+        <div v-else-if="searchForm.searchType == 2">
+          <area-select
+            ref="area-filter"
+            :is-all-tree="true"
+            :value="mapSearchQuery.areaCode"
+            @change="areaChange"
+            placeholder="请选择行政区划"
+            class="filter-item mr-10 w150"
+          />
+        </div>
+        <div v-else>
+          <div class="mb-10">
+            <span>经度:</span>
+            <el-input
+              v-model="mapSearchQuery.lon"
+              size="small"
+              placeholder="请输入经度"
+              clearable
+              class="w150 ml-5"
+            ></el-input>
+          </div>
+          <div>
+            <span>纬度:</span>
+            <el-input
+              v-model="mapSearchQuery.lat"
+              size="small"
+              placeholder="请输入纬度"
+              clearable
+              class="w150 ml-5"
+            ></el-input>
+          </div>
+          <el-button
+            type="primary"
+            size="small"
+            class="mt-10 fr"
+            @click="fitByPoint"
+            >查询</el-button
+          >
+        </div>
+      </div>
+    </div>
     <!-- 轨迹回放控制器 -->
     <!-- <div class="speed-control" v-if="trackPlayBackObj.showControl">
       <el-slider
@@ -56,6 +132,17 @@
         <div>{{ trackPlayBackObj.nowLength | isFixed }}千米</div>
       </div> -->
     </div>
+    <!-- 对比 -->
+    <div v-if="mapCompare" class="map-double">
+      <map-compare
+        :compareObject="compareObject"
+        :mapCompareQuery="compareObject.mapQuery"
+      ></map-compare>
+      <div class="close" @click="mapCompare = false">
+        <i class="el-icon-close" />
+      </div>
+      <div class="line" />
+    </div>
     <!-- 分屏 -->
     <div v-if="mapDouble" class="map-double">
       <div class="item">
@@ -66,9 +153,9 @@
         <div class="map-select">
           <div class="i-select" @click="handleDoubleLayers(1)">
             <div class="hd">
-              <!-- <i class="icon">
+              <i class="icon">
                 <svg-icon icon-class="international" />
-              </i> -->
+              </i>
               <i class="text">{{ doubleTitle1 }}</i>
               <i
                 class="arrow"
@@ -97,9 +184,9 @@
         <div class="map-select">
           <div class="i-select" @click="handleDoubleLayers(2)">
             <div class="hd">
-              <!-- <i class="icon">
+              <i class="icon">
                 <svg-icon icon-class="international" />
-              </i> -->
+              </i>
               <i class="text">{{ doubleTitle2 }}</i>
               <i
                 class="arrow"
@@ -130,15 +217,9 @@
 
     <!-- 对比 -->
     <div class="map-compare" />
-
     <!-- 卷帘新 -->
     <div v-if="mapRollerNew" class="map-roller-year">
-      <el-slider
-        v-model="rollerValue"
-        class="point"
-        :show-tooltip="false"
-        @input="bindRollerEvent1"
-      />
+      <el-slider v-model="rollerValue" class="point" :show-tooltip="false" />
       <div class="mask" :style="{ left: rollerValue + '%' }" />
       <div ref="roller1" class="roller-box1">
         <div
@@ -175,7 +256,7 @@
           @change="rollerYearChange($event, 2)"
         >
           <el-option
-            v-for="(item, index) in options"
+            v-for="item in options"
             :key="item.yearNo"
             :label="item.yearNo"
             :value="item.id + ''"
@@ -212,7 +293,7 @@
         @change="rollerYearChange($event, 1)"
       >
         <el-option
-          v-for="(item, index) in options"
+          v-for="item in options"
           :key="item.yearNo"
           :label="item.yearNo"
           :value="item.id + ''"
@@ -222,7 +303,6 @@
         <i class="el-icon-close" />
       </div>
     </div>
-
     <!-- 卷帘 -->
     <div v-if="mapRoller" class="map-roller">
       <div id="roller" ref="roller" />
@@ -297,7 +377,7 @@
       <div class="close" @click="hideRoller"><i class="el-icon-close" /></div>
     </div>
 
-    <div v-if="false" class="map-selects">
+    <div v-if="imageSelect" class="map-selects">
       <div class="map-select fr">
         <div class="i-select ml-10" @click="handleMapSelect('image')">
           <div class="hd">
@@ -360,7 +440,12 @@
           <div class="bd" :class="{ active: defaultMap.toolActive }">
             <ul>
               <li @click="showDouble">分屏</li>
-              <!-- <li>对比</li> -->
+              <li
+                @click="showCompare"
+                v-if="compareObject.mapQuery && compareObject.mapTypeList"
+              >
+                对比
+              </li>
               <li @click="showRoller">卷帘</li>
               <li @click="showMeasure('LineString')">测距</li>
               <li @click="showMeasure('Polygon')">测面</li>
@@ -369,50 +454,7 @@
         </div>
       </div>
     </div>
-
-    <div v-if="imageSelect" class="toolbar">
-      <div v-if="isShowTool" class="toolbar-check-box">
-        <div
-          v-for="(item, index) in radioItemList"
-          v-show="!showRadioItem.includes(item.id)"
-          :key="index + 'id'"
-          class="radio-item"
-          @click="toolbarClick(item.id)"
-        >
-          <svg-icon
-            :icon-class="item.svg"
-            :style="{
-              color: '#000',
-              fontSize: '20px',
-            }"
-          />
-          <div
-            :style="{
-              color: '#000',
-              marginLeft: '5px',
-            }"
-          >
-            {{ item.name }}
-          </div>
-        </div>
-      </div>
-      <el-select
-        v-model="toolBardata"
-        placeholder=""
-        :popper-class="'map-select-popper'"
-        class="map-select ml-10"
-        @change="mapSelectChange"
-      >
-        <el-option
-          v-for="(v, k) in defaultMap.imageLayers"
-          :key="k"
-          :label="v.title"
-          :value="v.name"
-        />
-      </el-select>
-    </div>
-
-    <!-- <div v-if="mapControl" class="map-control">
+    <div class="map-control" v-if="mapControl">
       <div
         v-if="baseSelect"
         class="item"
@@ -427,7 +469,7 @@
       <div class="item" @click="zoomOut()">
         <i class="el-icon-minus" />
       </div>
-    </div> -->
+    </div>
 
     <!--地图弹出层-->
     <div
@@ -458,9 +500,10 @@
         <div class="arrow" />
       </div>
     </div>
-    <!-- <div
+    <div
       :id="`popup_${id}`"
       class="popup"
+      :class="`${popupData.class}`"
       :style="{ transform: ` scale(${scaleValue})` }"
     >
       <div v-loading="popupLoading" class="body">
@@ -487,166 +530,6 @@
             @click="handlePopupBtn(v)"
           >
             {{ v.name }}
-          </div>
-        </div>
-      </div>
-      <div class="arrow" />
-    </div> -->
-    <!-- 地形模式 -->
-    <div v-if="isTerrain || isFullScreen" class="terrain-box">
-      <div v-show="terrainSmallSelect == 3" class="box-big">
-        <div class="title-box">
-          <div class="title">地形模式</div>
-          <el-checkbox v-model="showNoteLayer" @change="showNoteLayerChange"
-            >注记</el-checkbox
-          >
-        </div>
-        <div class="content-box">
-          <div
-            class="content-item"
-            :class="[baseLayerIndex == 0 ? 'content-item-on' : '']"
-            @click="changeBaseLayers(0)"
-          >
-            <img class="img" src="@/static/guide-bg.jpg" alt="" />
-            <div class="name">地图</div>
-          </div>
-          <div
-            class="content-item"
-            :class="[baseLayerIndex == 1 ? 'content-item-on' : '']"
-            @click="changeBaseLayers(1)"
-          >
-            <img class="img" src="@/static/guide-bg.jpg" alt="" />
-            <div class="name">影像</div>
-          </div>
-          <div
-            class="content-item"
-            :class="[baseLayerIndex == 2 ? 'content-item-on' : '']"
-            @click="changeBaseLayers(2)"
-          >
-            <img class="img" src="@/static/guide-bg.jpg" alt="" />
-            <div class="name">地形</div>
-          </div>
-          <div class="content-item">
-            <img class="img" src="@/static/guide-bg.jpg" alt="" />
-            <div class="name">三维</div>
-          </div>
-        </div>
-      </div>
-      <div class="box-small">
-        <div class="icon-box" @click="fullScreenClick">
-          <img
-            v-if="terrainSmallSelect == 0"
-            class="img"
-            src="@/static/templateImages/full-screen.png"
-            alt=""
-          />
-          <img
-            v-else
-            class="img"
-            src="@/static/templateImages/full-screen-off.png"
-            alt=""
-          />
-        </div>
-        <div class="icon-box" @click="zoomOut">
-          <img
-            v-if="terrainSmallSelect == 1"
-            class="img1"
-            src="@/static/templateImages/reduce.png"
-            alt=""
-          />
-          <img
-            v-else
-            class="img1"
-            src="@/static/templateImages/reduce-off.png"
-            alt=""
-          />
-        </div>
-        <div class="icon-box" @click="zoomIn">
-          <img
-            v-if="terrainSmallSelect == 2"
-            class="img"
-            src="@/static/templateImages/add.png"
-            alt=""
-          />
-          <img
-            v-else
-            class="img"
-            src="@/static/templateImages/add-off.png"
-            alt=""
-          />
-        </div>
-        <div class="icon-box" @click="isShowTerrainBigBoxClick">
-          <img
-            v-if="terrainSmallSelect == 3"
-            class="img3"
-            src="@/static/templateImages/map-icon.png"
-            alt=""
-          />
-          <img
-            v-else
-            class="img3"
-            src="@/static/templateImages/map-icon-off.png"
-            alt=""
-          />
-        </div>
-      </div>
-    </div>
-    <div
-      :id="`popup_${id}`"
-      class="popup-new"
-      :style="{ transform: ` scale(${scaleValue})` }"
-    >
-      <div v-loading="popupLoading" class="body">
-        <div class="hd">
-          <div class="title">{{ popupData.title }}</div>
-          <div class="close" @click="closePopup()">
-            <i class="el-icon-close" />
-          </div>
-        </div>
-        <div id="popup-content" ref="popupContent" class="bd">
-          <div
-            v-for="(v, k) in popupData.content"
-            :key="k"
-            :class="v.type == '99' ? 'privew' : 'item'"
-            :style="{ width: '100% ' }"
-          >
-            <!-- :style="{ width: v.width }" -->
-            <template v-if="v.type == '1'">
-              <span>{{ v.key }}</span>
-              <span v-if="v.isshow">
-                {{ isShowSecretFunction(v.value, 3, 7)
-                }}<el-button
-                  size="mini"
-                  class="ml-10"
-                  @click="v.isshow = !v.isshow"
-                  >查看</el-button
-                >
-              </span>
-              <span v-else>
-                {{ v.value
-                }}<el-button
-                  size="mini"
-                  class="ml-10"
-                  @click="v.isshow = !v.isshow"
-                  >隐藏</el-button
-                >
-              </span>
-            </template>
-            <template v-else-if="v.type == '99'">
-              <!-- <video-preview :previewData="{ id: v.value, platform: v.platform}"></video-preview> -->
-            </template>
-            <template v-else>
-              <span>{{ v.key }}</span>
-              <span class="value" :title="v.value">{{ v.value || "-" }}</span>
-            </template>
-          </div>
-        </div>
-        <div class="ft">
-          <div v-for="(v, k) in popupData.buttons" :key="k">
-            <!-- {{ v.name }} -->
-            <el-button @click="handlePopupBtn(v)" type="primary">{{
-              v.name
-            }}</el-button>
           </div>
         </div>
       </div>
@@ -681,227 +564,31 @@
       </div>
     </div>
 
-    <!-- <div
+    <div
       v-if="JSON.stringify(imageLayerInfo) !== '{}' && mapInfo"
       class="map-info"
     >
       <span class="mr-10">{{ imageLayerInfo.no }}</span>
       <span class="mr-10">来源：{{ imageLayerInfo.origin }}</span>
-    </div> -->
-    <el-dialog
-      title=""
-      width="650px"
-      :visible.sync="positioningDialog"
-      :before-close="positioningDialogClose"
-      append-to-body
-    >
-      <div>
-        <el-tabs v-model="activeName" style="padding: 10px">
-          <el-tab-pane label="坐标" name="first">
-            <div style="display: flex; justify-content: center">
-              <el-form
-                ref="positioningDialogForm"
-                :model="positioningData"
-                label-width="80px"
-                :rules="positioningDialogRules"
-              >
-                <el-form-item label="类型：">
-                  <el-radio-group v-model="positioningData.type">
-                    <el-radio :label="1">浮点型(度)</el-radio>
-                    <el-radio :label="2">度分秒</el-radio>
-                    <el-radio :label="3">投影坐标</el-radio>
-                  </el-radio-group>
-                </el-form-item>
-
-                <div v-if="positioningData.type == 3">
-                  <div style="margin-left: 80px; margin-bottom: 15px">
-                    投影坐标系：EPSG:3857 转至 地理坐标系：EPSG:4326
-                  </div>
-                  <el-form-item label="经度：" prop="longitudeTY">
-                    <el-input
-                      v-model.trim="positioningData.longitudeTY"
-                      style="width: 464px"
-                      :placeholder="'请输入'"
-                    />
-                  </el-form-item>
-
-                  <el-form-item label="纬度：" prop="latitudeTY">
-                    <el-input
-                      v-model.trim="positioningData.latitudeTY"
-                      style="width: 464px"
-                      :placeholder="'请输入'"
-                    />
-                  </el-form-item>
-                </div>
-
-                <div v-if="positioningData.type == 1">
-                  <div style="margin-left: 80px; margin-bottom: 15px">
-                    地理坐标系：EPSG:4326
-                  </div>
-                  <el-form-item label="经度：" prop="longitude">
-                    <el-input
-                      v-model.trim="positioningData.longitude"
-                      style="width: 464px"
-                      :placeholder="'请输入'"
-                    />
-                  </el-form-item>
-
-                  <el-form-item label="纬度：" prop="latitude">
-                    <el-input
-                      v-model.trim="positioningData.latitude"
-                      style="width: 464px"
-                      :placeholder="'请输入'"
-                    />
-                  </el-form-item>
-                </div>
-
-                <div v-if="positioningData.type == 2">
-                  <div style="margin-left: 80px; margin-bottom: 15px">
-                    地理坐标系：EPSG:4326
-                  </div>
-                  <el-form-item label="经度：" prop="lon">
-                    <div style="display: flex; justify-content: space-between">
-                      <el-input
-                        v-model.trim="positioningData.lonD"
-                        style="width: 100px"
-                      />
-                      <div style="font-size: 20px; margin: 0 5px; color: #000">
-                        °
-                      </div>
-                      <el-input
-                        v-model.trim="positioningData.lonM"
-                        style="width: 100px"
-                      />
-                      <div style="font-size: 20px; margin: 0 5px; color: #000">
-                        ′
-                      </div>
-                      <el-input
-                        v-model.trim="positioningData.lonS"
-                        style="width: 100px"
-                      />
-                      <div style="font-size: 20px; margin: 0 5px; color: #000">
-                        .
-                      </div>
-                      <el-input
-                        v-model.trim="positioningData.lonX"
-                        style="width: 100px"
-                      />
-                      <div style="font-size: 20px; margin: 0 5px; color: #000">
-                        ″
-                      </div>
-                    </div>
-                  </el-form-item>
-
-                  <el-form-item label="纬度：" prop="lat">
-                    <div style="display: flex; justify-content: space-between">
-                      <el-input
-                        v-model.trim="positioningData.latD"
-                        style="width: 100px"
-                      />
-                      <div style="font-size: 20px; margin: 0 5px; color: #000">
-                        °
-                      </div>
-                      <el-input
-                        v-model.trim="positioningData.latM"
-                        style="width: 100px"
-                      />
-                      <div style="font-size: 20px; margin: 0 5px; color: #000">
-                        ′
-                      </div>
-                      <el-input
-                        v-model.trim="positioningData.latS"
-                        style="width: 100px"
-                      />
-                      <div style="font-size: 20px; margin: 0 5px; color: #000">
-                        .
-                      </div>
-                      <el-input
-                        v-model.trim="positioningData.latX"
-                        style="width: 100px"
-                      />
-                      <div style="font-size: 20px; margin: 0 5px; color: #000">
-                        ″
-                      </div>
-                    </div>
-                  </el-form-item>
-                </div>
-              </el-form>
-            </div>
-          </el-tab-pane>
-
-          <el-tab-pane label="地名搜索" name="second">
-            <div style="display: flex; justify-content: center">
-              <el-form :model="geographicData" label-width="80px">
-                <el-form-item label="地名：" prop="latitude">
-                  <el-autocomplete
-                    v-model="geographicData.name"
-                    :fetch-suggestions="geographicFetch"
-                    placeholder="请输入内容"
-                    :debounce="800"
-                    :value-key="autocompleteValueKey"
-                    style="width: 464px"
-                    :trigger-on-focus="false"
-                    @select="geographicHandleSelect"
-                  />
-                </el-form-item>
-              </el-form>
-            </div>
-          </el-tab-pane>
-
-          <el-tab-pane label="图斑搜索" name="three">
-            <div style="display: flex; justify-content: center">
-              <el-form :model="FreckleData" label-width="80px">
-                <el-form-item label="图斑号：" prop="latitude">
-                  <el-autocomplete
-                    v-model="FreckleData.name"
-                    :fetch-suggestions="FreckleFetch"
-                    placeholder="请输入内容"
-                    :debounce="800"
-                    :value-key="FreckleAutocompleteValueKey"
-                    style="width: 464px"
-                    :trigger-on-focus="false"
-                    @select="FreckleHandleSelect"
-                  />
-                </el-form-item>
-              </el-form>
-            </div>
-          </el-tab-pane>
-          <!-- <el-tab-pane label="林班小班" name="three">林班小班</el-tab-pane> -->
-        </el-tabs>
-      </div>
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="positioningDialogClose">取 消</el-button>
-        <el-button type="primary" @click="positioningDialogDetermine"
-          >确 定</el-button
-        >
-      </span>
-    </el-dialog>
-
+      <!-- <span>时相：{{imageLayerInfo.time || '未知'}}</span> -->
+    </div>
     <div v-if="mapRanging" class="map-ranging">
       <div id="ranging" ref="ranging" style="height: 100%" />
       <div class="close" @click="rangingClose"><i class="el-icon-close" /></div>
     </div>
-
     <VideoConnection v-if="videoData.show" :video-data="videoData" />
-
-    <SituationMap
-      v-if="situationData.show"
-      :situation-data="situationData"
-      @situationClose="situationClose"
-    />
   </div>
 </template>
 <script>
 import "ol/ol.css";
 import { get as getProjection } from "ol/proj";
-import { fromLonLat, transform } from "ol/proj";
 import {
-  // getWidth, getTopLeft, boundingExtent,
+  getWidth,
+  getTopLeft,
+  boundingExtent,
   extend,
   getCenter,
 } from "ol/extent";
-import { createBox } from "ol/interaction/Draw.js";
-import axios from "axios";
 import View from "ol/View";
 import Map from "ol/Map";
 import { defaults as defaultInteractions } from "ol/interaction";
@@ -911,18 +598,18 @@ import TileLayer from "ol/layer/Tile";
 import TileWMS from "ol/source/TileWMS";
 import VectorSource from "ol/source/Vector";
 import ClusterSource from "ol/source/Cluster"; // 聚合
+import Heatmap from "ol/layer/Heatmap";
+import WMTS from "ol/source/WMTS";
 import WMTSTileGrid from "ol/tilegrid/WMTS";
 import TileGrid from "ol/tilegrid/TileGrid";
 import VectorLayer from "ol/layer/Vector";
 import Feature from "ol/Feature";
 import Overlay from "ol/Overlay";
 // import geom from 'ol/geom.js'
+import Circle from "ol/geom/Circle";
 import MultiPoint from "ol/geom/MultiPoint";
 import Point from "ol/geom/Point";
-import { fromCircle } from "ol/geom/Polygon";
 import Polygon from "ol/geom/Polygon";
-import Circle from "ol/geom/Circle";
-import GeometryCollection from "ol/geom/GeometryCollection";
 import MultiPolygon from "ol/geom/MultiPolygon";
 import LineString from "ol/geom/LineString";
 import MultiLineString from "ol/geom/MultiLineString";
@@ -933,7 +620,6 @@ import olStyleText from "ol/style/Text";
 import olStyleCircle from "ol/style/Circle";
 import olStyleFill from "ol/style/Fill";
 import olStyleStroke from "ol/style/Stroke";
-import olStyleRegularShape from "ol/style/RegularShape";
 import XYZ from "ol/source/XYZ";
 import WKT from "ol/format/WKT";
 import lodash from "lodash";
@@ -958,23 +644,23 @@ import { bbox as bboxStrategy } from "ol/loadingstrategy";
 /* eslint-disable */
 
 import formatWKT from "terraformer-wkt-parser";
-import areaData from "./area-data";
-// import VideoConnection from "@/components/VideoConnection";
+// import areaData from "./area-data";
+import VideoConnection from "@/components/VideoConnection";
+import MapCompare from "@/components/MapLayer/mapCompare.vue";
+
 import { getRenderPixel } from "ol/render";
-import { deepClone, parseTime, dictLookup, flattenTreeData } from "@/utils";
-// import patrol from "@/api/patrol";
+import { deepClone, parseTime } from "@/utils";
+import patrol from "@/api/patrol";
+import { searchAreaList } from "@/api/tianditu";
 import { isArray } from "@/utils/validate";
 import { LinearRing } from "ol/geom"; //引入几何类
+import AreaSelect from "@/components/AreaSelect";
 const jsts = require("jsts/dist/jsts.min.js"); //引入jsts
-// import { sysAreaPage, sysAreaPageDetail } from "@/api/map";
-import { getMasterList } from "@/api/auth";
-// import {
-//   infoManagementDataPage,
-//   infoManagementDataDetail,
-// } from "@/api/settings";
 
-import SituationMap from "./situationMap.vue";
-// import VideoPreview  from "@/views/firePerceptionManage/videoMonitoringManage/compoents/VideoPreview"
+// 解决大屏中scale或zoom缩放后导致显示位置和实际位置不一致存在偏差问题
+import PluggableMap from "ol/PluggableMap";
+import { MousePosition, defaults } from "ol/control";
+import { createStringXY } from "ol/coordinate";
 
 const OL3Parser = new jsts.io.OL3Parser();
 OL3Parser.inject(
@@ -984,17 +670,19 @@ OL3Parser.inject(
   Polygon,
   MultiPoint,
   MultiLineString,
-  MultiPolygon,
-  GeometryCollection
+  MultiPolygon
 );
 
 export default {
   name: "MapLayer",
   props: {
-    // 是否需要展示地形模式
-    isTerrain: {
+    mapAnimation: {
       type: Boolean,
-      default: true,
+      default: false,
+    },
+    searchForm: {
+      type: Boolean | Object,
+      default: null,
     },
     copyMap: {
       type: Object,
@@ -1046,7 +734,7 @@ export default {
     // 显示注记图层，默认显示
     showNoteLayer: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     trackPlayBack: {
       type: Object,
@@ -1068,7 +756,6 @@ export default {
       type: Boolean,
       default: false,
     },
-
     baseLayer: {
       type: Number,
       default: 1,
@@ -1103,21 +790,36 @@ export default {
       type: Boolean,
       default: false,
     },
+    //控制竖向的工具栏
+    isTerrainVertical: {
+      type: Boolean,
+      default: false,
+    },
+    //控制竖向工具栏展示那些
+    showTerrainItem: {
+      type: Array,
+      required: false,
+      default() {
+        return ["terrain", "tool"];
+      },
+    },
+    // 比较下拉数据
+    compareObject: {
+      type: Object,
+      default() {
+        return {};
+      },
+    },
   },
   components: {
-    // VideoConnection,
-    SituationMap,
-    // VideoPreview,
+    VideoConnection,
+    AreaSelect,
+    MapCompare,
   },
   data() {
     const defaultMap = {
       //初始化地图配置项
-      // center: [114.99114990234375, 27.119064331054688],
-      // center: [
-      //   118.876099999999994, 38.7864199999999997, 125.73621,
-      //   43.4841499999999996,
-      // ],
-      center: [117.68555, 29.00391],
+      center: [114.99114990234375, 27.119064331054688],
       maxZoom: 18,
       minZoom: 4,
       zoom: 7,
@@ -1129,15 +831,18 @@ export default {
       tk: "f536641212889df16a6afaa1beff020b",
       layerEventType: "singleclick",
 
-      geoServerUrl: this.$mapUrl,
-      geoServerWork: "LYGL_SLDC_Work", //工作区
-      // geoServerData: 'LYGL_JiAn_Data',//数据存储
+      geoServerUrl: this.CommonConst.mapDefault.GeoserverAddress,
+      geoServerWork: this.CommonConst.mapDefault.GeoserverWork, //工作区
+      geoServerData: this.CommonConst.mapDefault.GeoserverData, //数据存储
 
       baseLayers: [
         {
-          url: "http://t4.tianditu.gov.cn/DataServer?T=vec_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b", //平面
-          noteUrl:
-            "http://t4.tianditu.gov.cn/DataServer?T=cva_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b",
+          url: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=vec_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`, //平面
+          noteUrl: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=cva_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`,
           name: "base_layer_tdt_vec_c", // 名称
           noteName: "base_layer_tdt_cva_c",
           title: "天地图", // 标题
@@ -1149,9 +854,12 @@ export default {
           no: "GS(2021)1487号", // 版本号
         },
         {
-          url: "http://t4.tianditu.gov.cn/DataServer?T=img_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b", // 影像
-          noteUrl:
-            "http://t4.tianditu.gov.cn/DataServer?T=cia_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b",
+          url: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=img_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`, // 影像
+          noteUrl: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=cia_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`,
           name: "base_layer_tdt_img_c", // 名称
           noteName: "base_layer_tdt_cia_c",
           title: "天地图", // 标题
@@ -1163,14 +871,30 @@ export default {
           no: "GS(2021)1487号", // 版本号
         },
         {
-          url: "http://t4.tianditu.gov.cn/DataServer?T=ter_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b", //地形
-          noteUrl:
-            "http://t4.tianditu.gov.cn/DataServer?T=cta_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b",
+          url: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=ter_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`, //地形
+          noteUrl: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=cta_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`,
           name: "base_layer_tdt_ter_c", // 名称
           noteName: "base_layer_tdt_cta_c",
           title: "天地图", // 标题
           index: 0, //
           origin: "天地图", // 来源
+          type: 1, // 影像类型
+          active: false, // 是否显示
+          time: "未知", // 更新时间
+          no: "GS(2021)1487号", // 版本号
+        },
+        {
+          url: `https://gisapp.xmghszzx.com:8030/gisProxy25/rest/services/CGCS2000/DOMMAP/MapServer/tile/{0}/{2}/{1}`, //厦门
+          noteUrl: `https://gisapp.xmghszzx.com:8030/gisProxy25/rest/services/CGCS2000/DEMMAP_CVA/MapServer/WMTS/tile/1.0.0/CGCS2000_DEMMAP_CVA/default/default028mm/{0}/{2}/{1}`,
+          name: "base_layer_tdt_ter_c", // 名称
+          noteName: "base_layer_tdt_cta_c",
+          title: "Anonymous", // 标题
+          index: 0, //
+          origin: "Anonymous", // 来源
           type: 1, // 影像类型
           active: false, // 是否显示
           time: "未知", // 更新时间
@@ -1183,8 +907,9 @@ export default {
       imageActive: false,
       imageLayers: [
         {
-          url: "https://jx.zhlzz.com:8036/slzy_yx/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: 'http://t5.tianditu.gov.cn/DataServer?T=img_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b',
+          url: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=img_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`,
           name: "base_layer_tdt",
           title: "天地图",
           index: 0,
@@ -1194,23 +919,23 @@ export default {
           time: "未知",
           no: "GS(2021)1487号",
         },
-        // {
-        //   index: 0,
-        //   url: 'https://jx.zhlzz.com:8036/slzy_yx/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
-        //   // url: "http://124.193.194.41/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-        //   name: 'image_layer_0',
-        //   title: '即时影像',
-        //   type: 0,
-        //   active: false,
-        //   origin: '国家林草局',
-        //   time: null,
-        //   no: 'GS(2020)3758号',
-        //   year: '2022'
-        // },
+        {
+          index: 0,
+          url: "https://jx.zhlzz.com:8036/slzy_yx/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          // url: "http://124.193.194.41/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          name: "image_layer_0",
+          title: "即时影像",
+          type: 0,
+          active: false,
+          origin: "国家林草局",
+          time: null,
+          no: "GS(2020)3758号",
+          year: "2022",
+        },
         {
           index: 0,
           url: "https://jx.zhlzz.com:8036/slzy_2021/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: 'http://124.193.194.42:8080/onemap21/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          // url: "http://124.193.194.42:8080/onemap21/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_1",
           title: "2021版影像",
           type: 0,
@@ -1223,7 +948,7 @@ export default {
         {
           index: 0,
           url: "https://jx.zhlzz.com:8036/slzy_2020/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: 'http://124.193.194.42:8080/onemap20/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          // url: "http://124.193.194.42:8080/onemap20/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_2",
           title: "2020版影像",
           type: 0,
@@ -1236,7 +961,7 @@ export default {
         {
           index: 0,
           url: "https://jx.zhlzz.com:8036/slzy_2019/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: 'http://124.193.194.42:8080/onemap19/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          // url: "http://124.193.194.42:8080/onemap19/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_3",
           title: "2019版影像",
           type: 0,
@@ -1249,7 +974,7 @@ export default {
         {
           index: 0,
           url: "https://jx.zhlzz.com:8036/slzy_2018/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: 'http://124.193.194.42:8080/onemap18/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          // url: "http://124.193.194.42:8080/onemap18/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_4",
           title: "2018版影像",
           type: 0,
@@ -1262,7 +987,7 @@ export default {
         {
           index: 0,
           url: "https://jx.zhlzz.com:8036/slzy_2017/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: 'http://124.193.194.42:8080/onemap17/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          // url: "http://124.193.194.42:8080/onemap17/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_5",
           title: "2017版影像",
           type: 0,
@@ -1343,6 +1068,7 @@ export default {
         dblclick: {},
         pointermove: {},
         singleclick: {},
+        vectorEventFun: {},
       },
       isOpenDFM: true, //是否显示度分秒
       fractionDigits: 2, //保留位数,
@@ -1350,71 +1076,12 @@ export default {
     const map = null;
     const view = null;
     const popupLayer = null;
-    const price = (rule, value, callback) => {
-      const reg = /^[+-]?(0|([1-9]\d*))(\.\d+)?$/;
-      if (!value) {
-        callback(new Error("请输入"));
-      } else if (!Number(value)) {
-        callback(new Error("请输入数字值"));
-      } else {
-        if (reg.test(value)) {
-          callback();
-        } else {
-          callback(new Error("请输入正确的数值"));
-        }
-      }
-    };
-    const lonvalidator = (rule, value, callback) => {
-      const reg = /^[+-]?(0|([1-9]\d*))?$/;
-      let lonD = this.positioningData.lonD;
-      let lonM = this.positioningData.lonM;
-      let lonS = this.positioningData.lonS;
-      let lonX = this.positioningData.lonX;
-      if (lonD === "" || lonM === "" || lonS === "" || lonX === "") {
-        callback(new Error("请输入"));
-      } else {
-        if (
-          reg.test(lonD) &&
-          reg.test(lonM) &&
-          reg.test(lonS) &&
-          reg.test(lonX)
-        ) {
-          callback();
-        } else {
-          callback(new Error("请输入正确的数值"));
-        }
-      }
-    };
-    const latvalidator = (rule, value, callback) => {
-      const reg = /^[+-]?(0|([1-9]\d*))?$/;
-      let latD = this.positioningData.latD;
-      let latM = this.positioningData.latM;
-      let latS = this.positioningData.latS;
-      let latX = this.positioningData.latX;
-      if (latD === "" || latM === "" || latS === "" || latX === "") {
-        callback(new Error("请输入"));
-      } else {
-        if (
-          reg.test(latD) &&
-          reg.test(latM) &&
-          reg.test(latS) &&
-          reg.test(latX)
-        ) {
-          callback();
-        } else {
-          callback(new Error("请输入正确的数值"));
-        }
-      }
-    };
-    var helpTooltipElement = null;
-    var feature = null;
-    var helpTooltip = null;
-    var draw = null;
-    var measureTooltipElement = null;
-    var measureTooltip = null;
-    var listener = null;
-    var mapMouseMove = null;
     return {
+      searchType: 1,
+      backAreaList: [],
+      mapSearchQuery: {
+        // areaCode: this.$store.getters.areaCode,
+      },
       imgType: null,
       videoData: {},
       map,
@@ -1425,6 +1092,7 @@ export default {
       baseLayerObj: {}, //加载图层图层信息存放，图层名称：图层信息
       drawLayerObj: {}, //前端绘制图层信息存放obj
       wmsLayerObj: {}, //geoserver图层存放obj
+      wmtsLayerObj: {}, //wtms图层存放obj
       trackPlayBackObj: {
         timeIndex: 0,
         nowDifTime: 0.0,
@@ -1463,7 +1131,9 @@ export default {
         description: '', */
       },
       toolData: {},
+      mapCompare: false, // 对比
       mapDouble: false,
+      mapCompareQuery: {},
       doubleView: null,
       doubleMap1: null,
       doubleMap2: null,
@@ -1475,7 +1145,6 @@ export default {
       doubleIndex2: 0,
       mapRoller: false,
       mapRollerNew: false,
-      rollerMap: null,
       rollerBardata1: "base_layer_tdt",
       rollerBardata2: "base_layer_tdt",
       rollerIndexNew1: 0,
@@ -1487,7 +1156,11 @@ export default {
       rollerMap2: null,
       roller2Width: 0,
       roller2Height: 0,
-      rollerWidth: 0,
+      rangingMap: null, // 这是工具绘制的新的一个Map对象就是新创建了一个地图，然后盖展示图层的地图上方
+      drawLayerObj1: {}, // 工具绘制图层信息存放obj，相当于和mapTypeList一样也是存放图层的
+      mapRanging: false, // 这就是控制工具所绘制的地图显示开关
+
+      rollerMap: null,
       rollerValue: 50,
       rollerTitle1: "",
       rollerTitle2: "",
@@ -1498,85 +1171,69 @@ export default {
       rollerImages1: [],
       rollerImages2: [],
       tips: null,
-      toolBardata: "base_layer_tdt",
-      radioItemList: [
-        { name: "定位", id: 3, svg: "custom-location" },
-        { name: "分屏", id: 1, svg: "custom-map-double" },
-        { name: "卷帘", id: 2, svg: "custom-map-roller" },
-        { name: "测距", id: 4, svg: "custom-measure-length" },
-        { name: "测面", id: 5, svg: "custom-measure-square" },
-        // { name: "框选", id: 6, svg: "custom-measure-square" },
-      ],
-      positioningDialog: false, // 定位弹窗控制开关
-      activeName: "first", // 定位弹窗tab切换的值
-      // 定位弹窗form表单
-
-      positioningData: {
-        type: 1,
-        longitude: "",
-        latitude: "",
-        longitudeTY: "",
-        latitudeTY: "",
-        lonD: "",
-        lonM: "",
-        lonS: "",
-        lonX: "0",
-        latD: "",
-        latM: "",
-        latS: "",
-        latX: "0",
+      defaultWmts: {
+        gridsetName: "EPSG:4326",
+        gridNames: [
+          "EPSG:4326:0",
+          "EPSG:4326:1",
+          "EPSG:4326:2",
+          "EPSG:4326:3",
+          "EPSG:4326:4",
+          "EPSG:4326:5",
+          "EPSG:4326:6",
+          "EPSG:4326:7",
+          "EPSG:4326:8",
+          "EPSG:4326:9",
+          "EPSG:4326:10",
+          "EPSG:4326:11",
+          "EPSG:4326:12",
+          "EPSG:4326:13",
+          "EPSG:4326:14",
+          "EPSG:4326:15",
+          "EPSG:4326:16",
+          "EPSG:4326:17",
+          "EPSG:4326:18",
+          "EPSG:4326:19",
+          "EPSG:4326:20",
+          "EPSG:4326:21",
+        ],
+        style: "",
+        format: "image/png",
+        // infoFormat: "text/html",
+        infoFormat: "application/json",
+        layerName: "testGroup",
+        projection: "EPSG:4326",
+        resolutions: [
+          0.703125, 0.3515625, 0.17578125, 0.087890625, 0.0439453125,
+          0.02197265625, 0.010986328125, 0.0054931640625, 0.00274658203125,
+          0.001373291015625, 6.866455078125e-4, 3.4332275390625e-4,
+          1.71661376953125e-4, 8.58306884765625e-5, 4.291534423828125e-5,
+          2.1457672119140625e-5, 1.0728836059570312e-5, 5.364418029785156e-6,
+          2.682209014892578e-6, 1.341104507446289e-6, 6.705522537231445e-7,
+          3.3527612686157227e-7,
+        ],
+        baseParams: [
+          "VERSION",
+          "LAYER",
+          "STYLE",
+          "TILEMATRIX",
+          "TILEMATRIXSET",
+          "SERVICE",
+          "FORMAT",
+        ],
       },
-      // 地名搜索功能
-      geographicData: {
-        name: "",
-      },
-      autocompleteValueKey: "areaName",
-      geographicSelectData: {},
-      // 图斑搜索
-      FreckleData: {
-        name: "",
-      },
-      FreckleAutocompleteValueKey: "stringText",
-      FreckleSelectData: {},
-      // 定位弹窗form规则
-      positioningDialogRules: {
-        longitude: [{ required: true, validator: price, trigger: "blur" }],
-        latitude: [{ required: true, validator: price, trigger: "blur" }],
-        longitudeTY: [{ required: true, validator: price, trigger: "blur" }],
-        latitudeTY: [{ required: true, validator: price, trigger: "blur" }],
-        lon: [{ required: true, validator: lonvalidator, trigger: "blur" }],
-        lat: [{ required: true, validator: latvalidator, trigger: "blur" }],
-      },
-      rangingMap: null, // 这是工具绘制的新的一个Map对象就是新创建了一个地图，然后盖展示图层的地图上方
-      drawLayerObj1: {}, // 工具绘制图层信息存放obj，相当于和mapTypeList一样也是存放图层的
-      mapRanging: false, // 这就是控制工具所绘制的地图显示开关
-
-      situationData: {},
-      selectDataInteraction: null,
-      isShowLong: false,
-      isShowLat: false,
-      isFullScreen: false, // 是否全屏
-      terrainSmallSelect: -1, // 地形模式小框选择的按钮
     };
   },
   created() {
     /* setTimeout(() => {
       this.showRoller();
     }, 1000); */
-    // getMasterList().then((res) => {
-    //   if (res.code == "200") {
-    //     this.options = res.data;
-    //   }
-    // });
   },
   mounted() {
     this.$nextTick(() => {
       this.initMap();
       this.roller2Width = this.$refs.rootmap.offsetWidth;
       this.roller2Height = this.$refs.rootmap.offsetHeight;
-      setTimeout(() => {
-        this.updateSizeFunction();
-      }, 400);
     });
   },
   beforeDestroy() {
@@ -1584,6 +1241,953 @@ export default {
   },
   watch: {},
   methods: {
+    getAreaList(areaName) {
+      if (areaName) {
+        const param = {
+          areaName,
+        };
+        searchAreaList(param).then((res) => {
+          this.backAreaList = res.data;
+        });
+      } else {
+        this.backAreaList = [];
+      }
+    },
+    // 行政区划
+    async areaChange(val) {
+      const temp = deepClone(val);
+      if (isArray(temp) && temp.length) {
+        this.mapSearchQuery.areaCode = temp.pop();
+      } else {
+        this.mapSearchQuery.areaCode = "";
+      }
+      this.searchForm.changePage = this.getAreaPerson;
+      this.getAreaPerson();
+    },
+    getAreaDetail(obj) {
+      this.$emit("getAreaDetail", obj);
+    },
+    async getAreaPerson() {
+      let param = {};
+      param.pageNo = this.searchForm.pageNo;
+      param.pageSize = this.searchForm.pageSize;
+      param.areaCode = this.mapSearchQuery.areaCode;
+      param.type = 1;
+      this.searchForm.loading = true;
+      let res = await this.searchForm.areaFun(param);
+      this.searchForm.loading = false;
+      this.searchForm.total = res.total;
+      this.$emit("fitByArea", res.data, res.total);
+    },
+    async fitByPoint() {
+      let param = {};
+      param.lon = this.mapSearchQuery.lon.includes("°")
+        ? this.changeToDu(this.mapSearchQuery.lon)
+        : this.mapSearchQuery.lon;
+      param.lat = this.mapSearchQuery.lat.includes("°")
+        ? this.changeToDu(this.mapSearchQuery.lat)
+        : this.mapSearchQuery.lat;
+      let res = await this.searchForm.pointFun(param);
+      this.$emit("fitByPoint", res.data, param);
+    },
+    changeToDFM(du) {
+      var str1 = du.split(".");
+      var du1 = str1[0];
+      var tp = "0." + str1[1];
+      var tp = String(tp * 60); //这里进行了强制类型转换
+      var str2 = tp.split(".");
+      var fen = str2[0];
+      tp = "0." + str2[1];
+      tp = tp * 60;
+      var miao = tp;
+      return du1 + "°" + fen + "'" + miao + '"';
+    },
+    changeToDu(dfm) {
+      const arr1 = dfm.split("°");
+      const d = arr1[0];
+      const arr2 = arr1[1].split("'");
+      let f = arr2[0] || 0;
+      const m = arr2[1].replace('"', "") || 0;
+      f = parseFloat(f) + parseFloat(m / 60);
+      var du = parseFloat(f / 60) + parseFloat(d);
+      return du;
+    },
+    multiPointToLine(arr) {
+      var geojsonTemp = {
+        type: "LineString",
+        coordinates: arr,
+      };
+      // 空间数据转换
+      const flyData = formatWKT.convert(geojsonTemp);
+      const polygonArr = [];
+      polygonArr.push({
+        coords: flyData,
+        id: new Date().getDate,
+      });
+      return polygonArr;
+    },
+    //根据wkt返回长度或面积单位米
+    getAreaByWkt: function (
+      wkt,
+      obj = { radius: 6378137, projection: "EPSG:4326" }
+    ) {
+      var geom = new WKT().readGeometry(wkt);
+      var output = 0;
+      if (geom instanceof Polygon || geom instanceof MultiPolygon) {
+        output = getArea(geom, obj);
+      } else if (
+        geom instanceof LineString ||
+        geom instanceof MultiLineString
+      ) {
+        output = getLength(geom, obj);
+      }
+      return output;
+    },
+    //根据wkt返回点位对象
+    getFeatureByWKT(wkt) {
+      return new WKT().readGeometryFromText(wkt);
+    },
+    getCoordinatesByWkt(wkt) {
+      let feature = this.getFeatureByWKT(wkt);
+      return feature.getCoordinates();
+    },
+    getDrawVector: function () {
+      if (!this.trackPlayBackObj.drawVector) {
+        this.trackPlayBackObj.drawVector = new VectorLayer({
+          name: "trackLayer",
+          source: new VectorSource(),
+          zIndex: 1000,
+        });
+        this.map.getLayers().insertAt(1, this.trackPlayBackObj.drawVector);
+      }
+      return this.trackPlayBackObj.drawVector;
+    },
+    checkIsInArea(point, boundaryLine) {
+      let inArea = false;
+      if (isArray(boundaryLine) && boundaryLine.length) {
+        for (let index = 0; index < boundaryLine.length; index++) {
+          const wkt = boundaryLine[index];
+
+          inArea = this.judgeIsIntersectsCoordinate(
+            this.getBufferWkt(wkt, this.trackPlayBackObj.buffer),
+            point
+          );
+          if (inArea) {
+            break;
+          }
+        }
+      } else if (!isArray(boundaryLine)) {
+        inArea = this.judgeIsIntersectsCoordinate(
+          this.getBufferWkt(boundaryLine, this.trackPlayBackObj.buffer),
+          point
+        );
+      } else {
+        inArea = true;
+      }
+      return inArea;
+    },
+    //判断责任区内外点位样式
+    checkPointStyle(point) {
+      //Point(118,28)
+      let style = this.checkIsInArea(
+        new WKT().writeGeometry(point),
+        this.trackPlayBackObj.areaBoundaryLine
+      )
+        ? new olStyle({
+            image: new olStyleIcon({
+              anchor: [0.5, 1],
+              scale: 0.8,
+              src: require("./image/pointhighlights-green.png"),
+            }),
+          })
+        : new olStyle({
+            image: new olStyleIcon({
+              anchor: [0.5, 1],
+              scale: 0.8,
+              src: require("./image/pointhighlights-red.png"),
+            }),
+          });
+      return style;
+    },
+    checkLineStyle() {
+      let style = new olStyle({
+        fill: new olStyleFill({
+          color: "rgba(255, 0, 0, 0.5)",
+        }),
+        stroke: new olStyleStroke({
+          color: this.trackPlayBackObj.color || "red",
+          width: 3,
+        }),
+      });
+      return style;
+    },
+    //添加线
+    addLine: function (point1, point2) {
+      var drawVector = this.getDrawVector();
+      let style = this.checkLineStyle();
+      if (point1 && point2) {
+        var line = new LineString([point1, point2]);
+        var feature = new Feature({
+          geometry: line,
+        });
+        feature.setStyle(style);
+        drawVector.getSource().addFeature(feature);
+      } else if (point1) {
+        var feature0 = drawVector.getSource().getFeatures()[0];
+        if (feature0) {
+          feature0.getGeometry().appendCoordinate(point1);
+        }
+      }
+    },
+    //添加点位
+    addPoint: function (point) {
+      var drawVector = this.getDrawVector();
+      var point = new Point(point);
+      let style = this.checkPointStyle(point);
+      var feature = new Feature({
+        geometry: point,
+      });
+      feature.setStyle(style);
+      drawVector.getSource().addFeature(feature);
+    },
+    calculateRotation: function (start, end) {
+      let dx = end[0] - start[0];
+      let dy = end[1] - start[1];
+      let rotation = Math.atan2(dy, dx) * (180 / Math.PI);
+      return rotation;
+    },
+    changeDirection: function (point1, point2) {
+      if (point1[0] - point2[0] > 0) {
+        this.trackPlayBackObj.showLeft = true;
+      } else {
+        this.trackPlayBackObj.showLeft = false;
+      }
+    },
+    loadTimeAndLength(index) {
+      this.trackPlayBackObj.nowDifTime =
+        index > -1
+          ? this.trackPlayBackObj.difTimeList[index]
+          : this.trackPlayBackObj.difTime;
+      this.trackPlayBackObj.nowLength =
+        index > -1
+          ? this.trackPlayBackObj.lengthList[index]
+          : this.trackPlayBackObj.length;
+    },
+    moveFeature: function (event) {
+      var vectorContext = event.vectorContext;
+      var index = this.trackPlayBackObj.index;
+      var date = this.trackPlayBackObj.date;
+      let timeIndex = this.trackPlayBackObj.timeIndex; //获取时间轴下标
+      var newPoints = this.trackPlayBackObj.newPoints;
+      if (index >= newPoints.length) {
+        this.stopAnimation();
+        return;
+      }
+      var frameState = event.frameState;
+      this.loadTrackPosition(newPoints[index]);
+      this.loadTimeAndLength(index);
+      if (this.trackPlayBackObj.drawType === "point") {
+        this.addPoint(newPoints[index]);
+      } else if (this.trackPlayBackObj.drawType === "line") {
+        if (index == 1) {
+          this.addLine(newPoints[0], newPoints[1]);
+        } else if (index > 1) {
+          this.addLine(newPoints[index]);
+        }
+      }
+      if (index > 0) {
+        var rotation = this.calculateRotation(
+          newPoints[index - 1],
+          newPoints[index]
+        );
+        let imgType = this.trackPlayBackObj.imgType;
+        if (imgType == "people") {
+          this.changeDirection(newPoints[index - 1], newPoints[index]);
+        } else if (imgType == "uav") {
+          this.trackPlayBackObj.imgDeg = -rotation;
+        }
+      }
+      if (this.trackPlayBackObj.ispuse == 0) {
+        var t = frameState.time - date;
+        if (t / this.trackPlayBackObj.speed > index - timeIndex) {
+          //开始下标减去时间轴下标判断动画重新开始执行步骤
+          this.trackPlayBackObj.index = this.trackPlayBackObj.index + 1;
+          this.trackPlayBackObj.timeRate =
+            this.trackPlayBackObj.difTimeList[index].toFixed(2) * 1;
+          // ((index / newPoints.length) * 100) | 0;
+        }
+      }
+    },
+    changeTimeRate(val) {
+      var drawVector = this.getDrawVector();
+      drawVector.getSource().clear(); //清空视图
+      let marks = this.trackPlayBackObj.marks;
+      let arr = Object.keys(marks).map((key) => key);
+      let index = marks[this.findNearestNumber(arr, val)].index; //查找根据点击位置查找最相近的下标
+      let points = this.trackPlayBackObj.newPoints.slice(0, index);
+      this.stopAnimation();
+      this.trackPlayBackObj.index = index;
+      this.trackPlayBackObj.timeIndex = index; //动画已跳过下标数
+      points.forEach((item, index) => {
+        //绘制进度条覆盖的点位
+        if (this.trackPlayBackObj.drawType == "point") {
+          this.addPoint(item);
+        } else {
+          if (index == 1) {
+            this.addLine(points[0], points[1]);
+          } else if (index > 1) {
+            this.addLine(points[index]);
+          }
+        }
+      });
+      this.startAnimation();
+      // console.log(drawVector.getSource().getFeatures());
+    },
+    findNearestNumber(arr, target) {
+      //查找数组内最近似的值
+      return arr.reduce((pre, curr) => {
+        return Math.abs(pre - target) > Math.abs(curr - target) ? curr : pre;
+      });
+    },
+    loadTrackPosition: function (coordinate) {
+      if (!this.trackPlayBackObj.overlay) {
+        const imgType = this.trackPlayBackObj.imgType;
+        const imgObj = {
+          people: {
+            widthOffeset: 64 / 2,
+            heightOffeset: 68,
+          },
+          uav: {
+            widthOffeset: 32 / 2,
+            heightOffeset: 32 / 2,
+          },
+        };
+        var widthOffeset = imgObj[imgType].widthOffeset;
+        var heightOffeset = imgObj[imgType].heightOffeset;
+        this.trackPlayBackObj.overlay = new Overlay({
+          position: [0, 0],
+          positioning: "center-bottom",
+          element: this.$refs[`map-${imgType}`],
+          //stopEvent: false,
+          offset: [-widthOffeset, -heightOffeset],
+        });
+        this.map.addOverlay(this.trackPlayBackObj.overlay);
+      }
+      this.trackPlayBackObj.overlay.setPosition(coordinate);
+    },
+    //停止轨迹回放动画
+    stopAnimation: function (mapID) {
+      this.trackPlayBackObj.index = 0;
+      this.trackPlayBackObj.date = 0;
+      this.trackPlayBackObj.tempDate = 0;
+      this.trackPlayBackObj.timeRate = this.trackPlayBackObj.difTime;
+      this.loadTimeAndLength();
+      this.map.un("postcompose", this.moveFeature);
+      clearInterval(this.trackPlayBackObj.inter);
+      this.trackPlayBackObj.inter = null;
+    },
+    checkTimeMarks() {
+      if (this.trackPlayBackObj.difTimeList) {
+        let marks = {};
+        let timeList = this.trackPlayBackObj.difTimeList;
+        timeList.forEach((item, index) => {
+          // console.log(index);
+          marks[item] = {
+            index,
+          };
+        });
+        this.trackPlayBackObj.marks = marks;
+        return marks;
+      }
+    },
+    DealPoints: function (points) {
+      var newPoints = [];
+      points.forEach((item, i) => {
+        var currLng = parseFloat(item[0]);
+        var currLat = parseFloat(item[1]);
+        newPoints.push([currLng, currLat]);
+
+        if (i + 1 == points.length) {
+          return false;
+        }
+        var nextLng = parseFloat(points[i + 1][0]);
+        var nextLat = parseFloat(points[i + 1][1]);
+
+        var diffLng = nextLng - currLng;
+        var diffLat = nextLat - currLat;
+
+        var currParamsLng = 0;
+        var currParamsLat = 0;
+
+        var base = 0.0001;
+
+        currParamsLng = 0.0001;
+        currParamsLat = (diffLat / diffLng) * 0.0001;
+
+        if (diffLng < diffLat) {
+          currParamsLng = (diffLng / diffLat) * 0.0001;
+          currParamsLat = 0.0001;
+        }
+        if (currParamsLng < 0) {
+          currParamsLng = -currParamsLng;
+        }
+
+        if (diffLat > 0) {
+          if (currParamsLat < 0) {
+            currParamsLat = -currParamsLat;
+          }
+        } else {
+          if (currParamsLat > 0) {
+            currParamsLat = -currParamsLat;
+          }
+        }
+        if (diffLng == 0) {
+          currParamsLng = 0;
+          currParamsLat = 0.0001;
+        }
+
+        if (diffLat == 0) {
+          currParamsLng = 0.0001;
+          currParamsLat = 0;
+        }
+
+        if (diffLng > 0) {
+          currLng = currLng + currParamsLng;
+          currLat = currLat + currParamsLat;
+          while (currLng < nextLng) {
+            newPoints.push([currLng, currLat]);
+
+            currLng = currLng + currParamsLng;
+            currLat = currLat + currParamsLat;
+          }
+        } else if (diffLng < 0) {
+          currLng = currLng - currParamsLng;
+          currLat = currLat + currParamsLat;
+          while (currLng > nextLng) {
+            newPoints.push([currLng, currLat]);
+            currLng = currLng - currParamsLng;
+            currLat = currLat + currParamsLat;
+          }
+        } else {
+          currLng = currLng + currParamsLng;
+          currLat = currLat + currParamsLat;
+          while (currLat < nextLat) {
+            newPoints.push([currLng, currLat]);
+            currLng = currLng + currParamsLng;
+            currLat = currLat + currParamsLat;
+          }
+        }
+      });
+      return newPoints;
+    },
+    changeSpeed: function () {
+      this.trackPlayBackObj.speed = (100 - this.trackPlayBackObj.rate) * 10;
+    },
+    clearAnimation() {
+      this.trackPlayBackObj.speed = (100 - this.trackPlayBackObj.rate) * 10;
+      this.trackPlayBackObj.timeIndex = 0; //重置时间轴下标
+      this.stopAnimation();
+      if (this.trackPlayBackObj.drawVector) {
+        this.trackPlayBackObj.drawVector.getSource().clear();
+      }
+    },
+    refreshAnimation: function () {
+      this.clearAnimation();
+      this.startAnimation();
+    },
+    startAnimation: function () {
+      if (
+        this.trackPlayBackObj.date == undefined ||
+        this.trackPlayBackObj.date == 0
+      ) {
+        this.trackPlayBackObj.date = new Date().getTime();
+      }
+      if (
+        this.trackPlayBackObj.tempDate != undefined &&
+        this.trackPlayBackObj.tempDate != 0
+      ) {
+        this.trackPlayBackObj.date =
+          this.trackPlayBackObj.date +
+          (new Date().getTime() - this.trackPlayBackObj.tempDate);
+      }
+      this.trackPlayBackObj.ispuse = 0;
+      var lines = new LineString(this.trackPlayBackObj.newPoints);
+      var extent = lines.getExtent();
+      this.fitByExtent(extent, true, {
+        padding: this.trackPlayBackObj.padding || [100, 100, 100, 100],
+        fit: true,
+      });
+      this.map.on("postcompose", this.moveFeature);
+      this.map.render();
+      this.trackPlayBackObj.inter = setInterval(() => {
+        this.map.render();
+      }, this.trackPlayBackObj.speed);
+    },
+    //是否显示虚拟点位，平滑移动
+    checkPoints(arr) {
+      return this.trackPlayBackObj.showDeal
+        ? this.DealPoints(arr)
+        : this.trackPlayBackObj.arrData;
+    },
+    //加载巡护轨迹
+    trackPlayBackInit(data) {
+      var arr = [];
+      this.trackPlayBackObj.difTime =
+        data.difTime * 1 ||
+        ((new Date() - new Date(data.startTime)) / 1000 / 60 / 60).toFixed(2) *
+          1; //巡护时长
+      this.trackPlayBackObj.difTimeList = data.difTimeList || [];
+      this.trackPlayBackObj.length = data.length; //巡护距离
+      this.trackPlayBackObj.startTime = data.startTime; //巡护开始时间
+      this.trackPlayBackObj.endTime = data.endTime || parseTime(new Date()); //巡护结束时间
+      this.trackPlayBackObj.arrData = [];
+      this.trackPlayBackObj.speed = (100 - this.trackPlayBackObj.rate) * 10;
+      let points = data.patrolRecordRouteLine || [];
+      //data = data.reverse();
+      points.forEach((wkt) => {
+        var fea = new WKT().readGeometryFromText(wkt);
+        arr.push(fea.getCoordinates());
+        this.trackPlayBackObj.arrData.push(fea.getCoordinates());
+      });
+      this.trackPlayBackObj.newPoints = this.checkPoints(arr);
+      this.checkTimeAndLength();
+      this.startAnimation();
+    },
+    checkTimeAndLength() {
+      //计算
+      let difTimeList = [];
+      let lengthList = (this.trackPlayBackObj.lengthList = [0]);
+      if (
+        this.trackPlayBackObj.difTimeList &&
+        this.trackPlayBackObj.difTimeList.length
+      ) {
+        this.trackPlayBackObj.difTimeList.forEach((item) => {
+          difTimeList.push(
+            (new Date(item) - new Date(this.trackPlayBackObj.startTime)) /
+              1000 /
+              60 /
+              60
+          );
+        });
+      }
+      this.trackPlayBackObj.newPoints.forEach((newPoint, index) => {
+        let length = this.trackPlayBackObj.newPoints.length;
+        //每个点位时长换算,有返回时间及无返回
+        if (
+          !this.trackPlayBackObj.difTimeList ||
+          !this.trackPlayBackObj.difTimeList.length
+        ) {
+          difTimeList.push((this.trackPlayBackObj.difTime / length) * index);
+        }
+        //每个点位距离换算
+        if (index > 0) {
+          let oldPoint = this.trackPlayBackObj.newPoints[index - 1];
+          lengthList[index] =
+            lengthList[index - 1] +
+            this.getAreaByWkt(
+              new WKT().writeGeometry(new LineString([oldPoint, newPoint]))
+            ) /
+              1000;
+        } else if (index == length - 1) {
+          lengthList.push(this.trackPlayBackObj.length);
+        }
+      });
+      this.trackPlayBackObj.difTimeList = difTimeList;
+    },
+    //加载轨迹回放数据
+    async loadTrackPlayBackData(obj, trackData) {
+      let id = obj.id;
+      this.clearAnimation();
+      this.trackPlayBackObj = Object.assign(this.trackPlayBackObj, obj);
+      if (id) {
+        let res = await patrol.patrolForestryUserinfo("route", "get", {
+          id,
+        });
+        let data = res.data;
+        if (data.patrolRecordRouteLine.length) {
+          this.trackPlayBackInit(data);
+        }
+      } else {
+        this.trackPlayBackInit(trackData);
+      }
+    },
+    changeControl(bool) {
+      this.trackPlayBackObj.showControl = bool;
+    },
+    freeMomory(key) {
+      if (this.drawLayerObj[key].getSource() instanceof ClusterSource) {
+        this.drawLayerObj[key].getSource().getSource().clear();
+        this.drawLayerObj[key].getSource().clear();
+      } else {
+        this.drawLayerObj[key].getSource().clear();
+      }
+      delete this.drawLayerObj[key];
+    },
+    //销毁、清除内存
+    destroy() {
+      for (const key in this.drawLayerObj) {
+        if (Object.hasOwnProperty.call(this.drawLayerObj, key)) {
+          this.freeMomory(key);
+        }
+      }
+      this.map = null;
+      this.view = null;
+      this.draw = null;
+      this.snap = null;
+      if (this.trackPlayBackObj?.inter) {
+        clearInterval(this.trackPlayBackObj.inter);
+        this.trackPlayBackObj.inter = null;
+        this.trackPlayBackObj = null;
+      }
+    },
+
+    // 初始化加载地图
+    initMap: function () {
+      // 解决大屏中scale或zoom缩放后导致显示位置和实际位置不一致存在偏差问题
+      PluggableMap.prototype.getEventPixel = function (event) {
+        // eslint-disable-next-line no-underscore-dangle
+        const viewportPosition = this.viewport_.getBoundingClientRect();
+        let size = [viewportPosition.width, viewportPosition.height];
+        const view = this.getView();
+        if (view) {
+          // eslint-disable-next-line no-underscore-dangle
+          size = view.getViewportSize_();
+        }
+        const eventPosition =
+          "changedTouches" in event
+            ? /** @type {TouchEvent} */
+              event.changedTouches[0]
+            : /** @type {MouseEvent} */
+              event;
+
+        return [
+          ((eventPosition.clientX - viewportPosition.left) * size[0]) /
+            viewportPosition.width,
+          ((eventPosition.clientY - viewportPosition.top) * size[1]) /
+            viewportPosition.height,
+        ];
+      };
+
+      // 解决大屏中scale或zoom缩放后导致显示位置和实际位置不一致存在偏差问题
+      let mousePositionControl = new MousePosition({
+        coordinateFormat: createStringXY(4),
+        projection: "EPSG:4326",
+        className: "custom-mouse-position",
+        target: document.getElementById("mouse-position"),
+        undefinedHTML: "&nbsp;",
+      });
+
+      //debugger;
+      this.view = new View({
+        projection: getProjection("EPSG:4326"), //坐标系EPSG:4326
+        center: this.defaultMap.center, //中心点坐标
+        minZoom: this.defaultMap.minZoom, //最小级别
+        maxZoom: this.defaultMap.maxZoom,
+        zoom: this.defaultMap.zoom,
+        constrainResolution: true, // 限制zoom缩放为整数
+        // extent: this.defaultMap.extent, //范围限制
+      });
+      let view = null;
+      if (this.copyMap) {
+        view = this.copyMap.map.getView();
+      }
+      this.map = new Map({
+        layers: [],
+        view: view || this.view,
+        target: this.id,
+        controls: defaults({
+          zoom: false,
+          attributionOptions: {
+            collapsible: false,
+          },
+        }).extend([mousePositionControl]),
+        interactions: defaultInteractions({
+          pinchRotate: false, // 移动端禁止地图旋转
+          doubleClickZoom: false, //禁止双击放大地图
+        }),
+      });
+      if (this.showBaseLayer) {
+        this.addBaseLayer();
+      } else {
+        this.addScaleLint();
+      }
+    },
+    // 叠加wmts图层服务
+    addWmtsLayer: function (dataOption) {
+      let layerInfo = dataOption.layerInfo;
+      let layer = {};
+      let name = layerInfo.name || layerInfo.layerName;
+      let layerName = layerInfo.layerName || name;
+      // let work = layerInfo.work || this.defaultMap.geoServerWork; //config.mapConfig.geoserverWork; //工作空间
+
+      /* let filter = layerInfo.filter || this.getLayerFilter(this.query) */
+      /* console.log(filter)
+      return */
+      if (this.wmtsLayerObj[name]) {
+        this.wmtsLayerObj[name].setVisible(layerInfo.visible);
+        // if (layerInfo.filter && layerInfo.filter.length > 0) {
+        //   this.updateLayerByFilter(this.wtmsLayerObj[name], layerInfo.filter);
+        // }
+      } else {
+        let url = (layerInfo.url || this.defaultMap.geoServerUrl) + "?";
+        let defaultWmtsParams = {
+          VERSION: "1.0.0",
+          LAYER: layerName,
+          STYLE: this.defaultWmts.style,
+          TILEMATRIX: layerInfo.gridNames || this.defaultWmts.gridNames,
+          TILEMATRIXSET: layerInfo.gridsetName || this.defaultWmts.gridsetName,
+          SERVICE: "WMTS",
+          FORMAT: layerInfo.format || this.defaultWmts.format,
+        };
+        Object.keys(defaultWmtsParams).forEach((param) => {
+          if (this.defaultWmts.baseParams.indexOf(param.toUpperCase()) < 0) {
+            url = url + param + "=" + defaultWmtsParams[param] + "&";
+          }
+        });
+        url = url.slice(0, -1);
+        layer.url = `${url}`;
+        layer.baseUrl = layerInfo.url || this.defaultMap.geoServerUrl;
+        layer.layer = `${layerName}`;
+        layer.name = name;
+        layer.position = layerInfo.position;
+        layer.visible = layerInfo.visible;
+        layer.format = layerInfo.format || this.defaultWmts.format;
+        layer.infoFormat = layerInfo.infoFormat || this.defaultWmts.infoFormat;
+        layer.version = layerInfo.version || "1.1.1";
+        layer.projection = getProjection(
+          layer.projection || this.defaultWmts.projection
+        );
+        layer.style = layerInfo.style || this.defaultWmts.style;
+        layer.matrixSet = defaultWmtsParams["TILEMATRIXSET"];
+        layer.matrixIds = defaultWmtsParams["TILEMATRIX"];
+        layer.resolutions =
+          layerInfo.resolutions || this.defaultWmts.resolutions;
+        let layerObj = this.initWmtsLayer(layer);
+        layerObj.layerOption = layer;
+        if (layerInfo.position) {
+          var layersArray = this.map.getLayers();
+          layersArray.insertAt(layerInfo.position, layerObj);
+        } else {
+          this.map.addLayer(layerObj);
+        }
+        this.wmtsLayerObj[name] = layerObj;
+
+        if (layerInfo.position) {
+          this.wmtsLayerObj[name].setZIndex(layerInfo.position);
+        }
+
+        // 更新地图缩放
+        if (layerInfo.fit) {
+          this.map.getView().fit(this.defaultMap.extent, this.map.getSize());
+        }
+        if (typeof dataOption.layerEventFun == "function") {
+          this.bindEventForWmsLayer(dataOption);
+        }
+      }
+    },
+    initWmtsLayer(layer) {
+      return new TileLayer({
+        source: new WMTS({
+          url: layer.url,
+          layer: layer.layer,
+          matrixSet: layer.matrixSet,
+          format: layer.format,
+          projection: layer.projection,
+          tileGrid: new WMTSTileGrid({
+            tileSize: [256, 256],
+            extent: [-180.0, -90.0, 180.0, 90.0],
+            origin: [-180.0, 90.0],
+            resolutions: layer.resolutions,
+            matrixIds: layer.matrixIds,
+          }),
+          style: layer.style,
+          wrapX: true,
+        }),
+      });
+    },
+    addLayer(map, obj) {
+      map = map || this.map;
+      const layer = obj.layer;
+      const position = obj.position;
+      if (obj.position != null) {
+        const layersArray = map.getLayers();
+        layersArray.insertAt(position, layer);
+      } else {
+        map.addLayer(layer);
+      }
+      /* if (obj.singleClick && typeof (obj.singleClick) == 'function') {
+          myMap.event.singleClick(layer, obj.singleClick);
+      } */
+    },
+    // 对比
+    showCompare() {
+      console.log("treeData", this.compareObject.treeData);
+      this.mapCompare = true;
+    },
+    //显示分屏
+    showDouble() {
+      this.mapDouble = true;
+
+      this.toolData["double_1_layerObj"] = {};
+      this.toolData["double_2_layerObj"] = {};
+
+      const currParam = this.defaultMap.baseLayers[this.baseLayerIndex];
+      const currLayer = this.initBaseLayer(currParam);
+
+      this.toolData["double_1_layerObj"][currParam.name] = currLayer;
+      this.toolData["double_2_layerObj"][currParam.name] = currLayer;
+
+      this.doubleView = new View({
+        projection: getProjection("EPSG:4326"), //坐标系EPSG:4326
+        center: this.defaultMap.center, //中心点坐标
+        minZoom: this.defaultMap.minZoom, //最小级别
+        maxZoom: this.defaultMap.maxZoom,
+        zoom: this.defaultMap.zoom,
+        // extent: this.defaultMap.extent, //范围限制
+      });
+
+      this.$nextTick(() => {
+        this.doubleMap1 = new Map({
+          layers: [
+            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
+          ],
+          view: this.doubleView,
+          target: "double_1",
+          controls: [],
+        });
+        this.doubleMap2 = new Map({
+          layers: [
+            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
+          ],
+          view: this.doubleMap1.getView(),
+          target: "double_2",
+          controls: [],
+        });
+
+        this.doubleIndex1 = 0;
+        this.doubleIndex2 = 1;
+
+        const layer_1 = this.defaultMap.imageLayers[this.doubleIndex1];
+        const temp_1 = this.initImageLayer(layer_1);
+        const layer_2 = this.defaultMap.imageLayers[this.doubleIndex2];
+        const temp_2 = this.initImageLayer(layer_2);
+
+        this.doubleTitle1 = layer_1.title;
+        this.doubleTitle2 = layer_2.title;
+
+        this.toolData["double_1_layerObj"][layer_1.name] = temp_1;
+        this.toolData["double_2_layerObj"][layer_2.name] = temp_2;
+
+        this.addLayer(this.doubleMap1, { layer: temp_1, position: 1 });
+        this.addLayer(this.doubleMap2, { layer: temp_2, position: 1 });
+
+        //显示注记图层
+        if (this.showNoteLayer) {
+          const noteLayer = this.baseLayerObj[currParam.noteName];
+          this.addLayer(this.doubleMap1, { layer: noteLayer, position: 10 });
+          this.addLayer(this.doubleMap2, { layer: noteLayer, position: 10 });
+          this.toolData["double_1_layerObj"][currParam.noteName] = noteLayer;
+          this.toolData["double_2_layerObj"][currParam.noteName] = noteLayer;
+        }
+
+        for (const k in this.drawLayerObj) {
+          if (Object.hasOwnProperty.call(this.drawLayerObj, k)) {
+            const v = this.drawLayerObj[k];
+            if (v.values_.visible) {
+              this.addLayer(this.doubleMap1, {
+                layer: v,
+                position: v.values_.zIndex,
+              });
+              this.addLayer(this.doubleMap2, {
+                layer: v,
+                position: v.values_.zIndex,
+              });
+              this.toolData["double_1_layerObj"][k] = v;
+              this.toolData["double_2_layerObj"][k] = v;
+            }
+          }
+        }
+
+        for (const k in this.wmsLayerObj) {
+          if (Object.hasOwnProperty.call(this.wmsLayerObj, k)) {
+            const v = this.wmsLayerObj[k];
+            if (v.values_.visible) {
+              this.addLayer(this.doubleMap1, {
+                layer: v,
+                position: v.values_.zIndex,
+              });
+              this.addLayer(this.doubleMap2, {
+                layer: v,
+                position: v.values_.zIndex,
+              });
+              this.toolData["double_1_layerObj"][k] = v;
+              this.toolData["double_2_layerObj"][k] = v;
+            }
+          }
+        }
+      });
+    },
+    //关闭分屏
+    hideDouble() {
+      for (const k in this.toolData["double_1_layerObj"]) {
+        if (Object.hasOwnProperty.call(this.toolData["double_1_layerObj"], k)) {
+          const v = this.toolData["double_1_layerObj"][k];
+          this.doubleMap1.removeLayer(v);
+        }
+      }
+      for (const k in this.toolData["double_2_layerObj"]) {
+        if (Object.hasOwnProperty.call(this.toolData["double_2_layerObj"], k)) {
+          const v = this.toolData["double_2_layerObj"][k];
+          this.doubleMap2.removeLayer(v);
+        }
+      }
+      this.toolData["double_1_layerObj"] = {};
+      this.toolData["double_2_layerObj"] = {};
+      this.doubleView = null;
+      this.doubleMap1 = null;
+      this.doubleMap2 = null;
+      this.mapDouble = false;
+    },
+
+    // 打开分屏切换选项
+    handleDoubleLayers(tag) {
+      if (tag === 1) {
+        this.doubleActive1 = !this.doubleActive1;
+        this.doubleActive2 = false;
+      } else {
+        this.doubleActive1 = false;
+        this.doubleActive2 = !this.doubleActive2;
+      }
+    },
+
+    //分屏切换
+    changeDoubleLayers(map, tag, index) {
+      const layer = this.defaultMap.imageLayers[index];
+      const layerMap = this.toolData[`double_${tag}_layerObj`][layer.name];
+
+      if (tag === 1) {
+        this.doubleTitle1 = layer.title;
+        this.doubleIndex1 = index;
+      } else {
+        this.doubleTitle2 = layer.title;
+        this.doubleIndex2 = index;
+      }
+
+      for (let key in this.toolData[`double_${tag}_layerObj`]) {
+        if (key !== layer.name && key.indexOf("image_layer_") == 0) {
+          this.toolData[`double_${tag}_layerObj`][key].setVisible(false);
+        }
+      }
+
+      if (layerMap) {
+        layerMap.setVisible(true);
+      } else {
+        const temp = this.initImageLayer(layer);
+        this.toolData[`double_${tag}_layerObj`][layer.name] = temp;
+        this.addLayer(map, { layer: temp, position: 2 });
+      }
+    },
+
     // 工具栏点击事件
     toolbarClick(v) {
       switch (v) {
@@ -1662,7 +2266,7 @@ export default {
               single: true,
               style: {
                 fill: {
-                  color: "rgba(255, 255, 0, 1)",
+                  color: "rgba(255, 255, 0, 0.5)",
                 },
                 stroke: {
                   width: 2,
@@ -1742,7 +2346,24 @@ export default {
           break;
       }
     },
-
+    createMeasureTooltip() {
+      if (this.measureTooltipElement) {
+        this.measureTooltipElement.parentNode.removeChild(
+          this.measureTooltipElement
+        );
+      }
+      this.measureTooltipElement = document.createElement("div");
+      this.measureTooltipElement.className = "ol-tooltip ol-tooltip-measure";
+      this.measureTooltip = new Overlay({
+        element: this.measureTooltipElement,
+        offset: [0, -15],
+        positioning: "bottom-center",
+        stopEvent: false,
+        insertFirst: false,
+      });
+      // this.drawElements.push(this.measureTooltip);
+      this.rangingMap.addOverlay(this.measureTooltip);
+    },
     drawLayerLC(data, callback) {
       const _this = this;
 
@@ -1885,1098 +2506,6 @@ export default {
         this
       );
     },
-    createMeasureTooltip() {
-      if (this.measureTooltipElement) {
-        this.measureTooltipElement.parentNode.removeChild(
-          this.measureTooltipElement
-        );
-      }
-      this.measureTooltipElement = document.createElement("div");
-      this.measureTooltipElement.className = "ol-tooltip ol-tooltip-measure";
-      this.measureTooltip = new Overlay({
-        element: this.measureTooltipElement,
-        offset: [0, -15],
-        positioning: "bottom-center",
-        stopEvent: false,
-        insertFirst: false,
-      });
-      // this.drawElements.push(this.measureTooltip);
-      this.rangingMap.addOverlay(this.measureTooltip);
-    },
-
-    // 工具-定位弹窗关闭事件
-    positioningDialogClose() {
-      this.positioningData = {
-        type: 1,
-        longitude: "",
-        latitude: "",
-        longitudeTY: "",
-        latitudeTY: "",
-        lonD: "",
-        lonM: "",
-        lonS: "",
-        lonX: "0",
-        latD: "",
-        latM: "",
-        latS: "",
-        latX: "0",
-      };
-      this.positioningDialog = false;
-      this.radioSelect = "";
-      this.FreckleData.name = "";
-      this.geographicData.name = "";
-    },
-
-    // 测距关闭按钮
-    rangingClose() {
-      this.rangingMap = null;
-      this.drawLayerObj1 = [];
-      this.mapRanging = false;
-      this.radioSelect = "";
-    },
-
-    // 工具-定位弹窗确定事件
-    positioningDialogDetermine() {
-      let point, source, layer;
-      switch (this.activeName) {
-        case "first":
-          this.$refs["positioningDialogForm"].validate((valid) => {
-            if (valid) {
-              // 移动图层中心点，从而实现定位功能
-              let center = [];
-              if (this.positioningData.type == 1) {
-                center = [
-                  +this.positioningData.longitude,
-                  +this.positioningData.latitude,
-                ];
-              } else if (this.positioningData.type == 2) {
-                let lonD = +this.positioningData.lonD;
-                let lonM = +this.positioningData.lonM;
-                let lonS = this.positioningData.lonS;
-                let lonX = this.positioningData.lonX;
-                let latD = +this.positioningData.latD;
-                let latM = +this.positioningData.latM;
-                let latS = +this.positioningData.latS;
-                let latX = +this.positioningData.latX;
-                center = [
-                  lonD + lonM / 60 + (lonS + "." + lonX) / 3600,
-                  latD + latM / 60 + (latS + "." + latX) / 3600,
-                ];
-              } else {
-                center = [
-                  +this.positioningData.longitudeTY,
-                  +this.positioningData.latitudeTY,
-                ];
-                center = transform(center, "EPSG:3857", "EPSG:4326");
-              }
-              this.view.animate({
-                center: center,
-                zoom: 14,
-              });
-
-              point = new Feature({
-                geometry: new Point(center),
-              });
-              var style = new olStyle({
-                image: new olStyleIcon({
-                  src: require("./image/icon-position-blue.png"),
-                  scale: 1,
-                  rotateWithView: true,
-                  // rotation: Math.PI / 2
-                }),
-                text: new olStyleText({
-                  font: "normal 22px 黑体",
-                  // // 对其方式
-                  textAlign: "center",
-                  // 基准线
-                  textBaseline: "middle",
-                  offsetY: -60,
-                  offsetX: 0,
-                  backgroundFill: new olStyleStroke({
-                    color: "rgba(255,255,255,0.2)",
-                  }),
-                  backgroundStroke: new olStyleStroke({
-                    color: "rgba(0,0,255,1)",
-                    width: 3,
-                  }),
-                  // 文本填充样式
-                  fill: new olStyleFill({
-                    color: "rgba(0,0,0,1)",
-                  }),
-                  padding: [5, 5, 5, 5],
-
-                  // text: "森林消防专队\n防火物资储备库",
-                }),
-              });
-
-              point.setStyle(style);
-              source = new VectorSource({
-                features: [point],
-              });
-              layer = new VectorLayer({
-                source,
-              });
-              for (const key in this.drawLayerObj) {
-                if (key.indexOf("DY") > -1) {
-                  // this.drawLayerObj[key].setVisible(false);
-                  this.map.removeLayer(this.drawLayerObj[key]);
-                }
-              }
-              this.drawLayerObj["DY" + this.geographicSelectData.address] =
-                layer;
-              this.map.addLayer(
-                this.drawLayerObj["DY" + this.geographicSelectData.address]
-              );
-              layer.setZIndex(9999);
-              this.positioningDialogClose();
-              this.radioSelect = "";
-            }
-          });
-          break;
-        case "second":
-          let stationCoords = this.geographicSelectData.stationCoords.substring(
-            6,
-            this.geographicSelectData.stationCoords.length - 1
-          );
-          this.view.animate({
-            center: stationCoords.split(" "),
-            zoom: 12,
-          });
-          point = new Feature({
-            geometry: new Point(stationCoords.split(" ")),
-          });
-          var style = new olStyle({
-            image: new olStyleIcon({
-              src: require("./image/icon-position-blue.png"),
-              scale: 1,
-              rotateWithView: true,
-              // rotation: Math.PI / 2
-            }),
-            text: new olStyleText({
-              text: this.geographicSelectData.areaName,
-              offsetY: -40,
-              font: "bold 20px Arial",
-              fill: new olStyleFill({
-                color: "#000",
-              }),
-              stroke: new olStyleStroke({
-                color: "#fff",
-                width: 2,
-              }),
-            }),
-          });
-
-          point.setStyle(style);
-          source = new VectorSource({
-            features: [point],
-          });
-          layer = new VectorLayer({
-            source,
-          });
-          for (const key in this.drawLayerObj) {
-            if (key.indexOf("DY") > -1) {
-              // this.drawLayerObj[key].setVisible(false);
-              this.map.removeLayer(this.drawLayerObj[key]);
-            }
-          }
-          this.drawLayerObj["DY" + this.geographicSelectData.id] = layer;
-          this.map.addLayer(
-            this.drawLayerObj["DY" + this.geographicSelectData.id]
-          );
-
-          this.positioningDialogClose();
-          this.geographicData.name = "";
-          break;
-        case "three":
-          let WKTString = this.FreckleSelectData.boundaryLine.split(";")[1]
-            ? this.FreckleSelectData.boundaryLine.split(";")[1]
-            : this.FreckleSelectData.boundaryLine.split(";")[0];
-
-          let wktFormat = new WKT(); // 创建WKT格式化对象
-          let feature = wktFormat.readFeature(WKTString); // 解析WKT数据为矢量要素
-          let center = getCenter(feature.getGeometry().getExtent()); // 获取矢量要素的中心点坐标
-
-          this.view.animate({
-            center: center,
-            zoom: 14,
-          });
-
-          point = new Feature({
-            geometry: new Point(center),
-          });
-          var style = new olStyle({
-            image: new olStyleIcon({
-              src: require("./image/icon-position-blue.png"),
-              scale: 1,
-              rotateWithView: true,
-              // rotation: Math.PI / 2
-            }),
-            text: new olStyleText({
-              text: "图斑号：" + this.FreckleSelectData.tbbh,
-              offsetY: -40,
-              font: "bold 20px Arial",
-              fill: new olStyleFill({
-                color: "#000",
-              }),
-              stroke: new olStyleStroke({
-                color: "#fff",
-                width: 2,
-              }),
-            }),
-          });
-
-          point.setStyle(style);
-          source = new VectorSource({
-            features: [point],
-          });
-          layer = new VectorLayer({
-            source,
-          });
-          for (let key in this.drawLayerObj) {
-            if (key.indexOf("DY") > -1) {
-              // this.drawLayerObj[key].setVisible(false);
-              this.map.removeLayer(this.drawLayerObj[key]);
-            }
-          }
-          this.drawLayerObj["DY" + this.FreckleSelectData.id] = layer;
-          this.map.addLayer(
-            this.drawLayerObj["DY" + this.FreckleSelectData.id]
-          );
-          layer.setZIndex(9999);
-          this.positioningDialogClose();
-          this.FreckleData.name = "";
-
-          break;
-        default:
-          break;
-      }
-    },
-
-    geographicHandleSelect(item) {
-      if (item) {
-        sysAreaPageDetail(item.id).then((res) => {
-          this.geographicSelectData = res.data;
-        });
-      }
-    },
-
-    geographicFetch(queryString, cb) {
-      if (queryString) {
-        sysAreaPage({ areaName: queryString }).then((res) => {
-          if (res.data.list.length == 0) {
-            this.$message.warning("该位置不在辽宁省内，请重新输出");
-            this.geographicData.name = "";
-            cb([]);
-          } else {
-            cb(res.data.list);
-          }
-        });
-      }
-    },
-
-    FreckleHandleSelect(item) {
-      if (item) {
-        infoManagementDataDetail(item.id).then((res) => {
-          this.FreckleSelectData = res.data;
-        });
-      }
-    },
-
-    FreckleFetch(queryString, cb) {
-      if (queryString) {
-        infoManagementDataPage({
-          areaCode: "",
-          masterId: this.rollerYear,
-          pageNo: 1,
-          pageSize: 99999,
-          type: "forestry_total",
-          tbbh: queryString,
-        }).then((res) => {
-          if (res.data.list.length == 0) {
-            // this.$message.warning('该位置不在辽宁省内，请重新输出');
-            this.FreckleData.name = "";
-            cb([]);
-          } else {
-            let list = res.data.list;
-            const allTree = flattenTreeData(
-              JSON.parse(sessionStorage.getItem("areaTree"))
-            );
-            list.forEach((item) => {
-              let sheng = dictLookup(
-                allTree,
-                item.sheng,
-                "areaCode",
-                "areaName"
-              );
-              let shi = dictLookup(allTree, item.shi, "areaCode", "areaName");
-              let xian = dictLookup(allTree, item.xian, "areaCode", "areaName");
-              let xiang = dictLookup(
-                allTree,
-                item.xiang,
-                "areaCode",
-                "areaName"
-              );
-              item.stringText =
-                "图斑号:" +
-                queryString +
-                "," +
-                item.yearNo +
-                "年," +
-                sheng +
-                "-" +
-                shi +
-                "-" +
-                xian +
-                "-" +
-                xiang;
-            });
-            cb(list);
-          }
-        });
-      }
-    },
-
-    // 地图影像切换事件，这个页面没有写功能，就是直接调用MapLayer组件里面的事件，因为里面有封装好，由于样式不符合所以重写了一个在这个页面，功能还是直接调用的
-    mapSelectChange(v) {
-      const index = this.defaultMap.imageLayers.findIndex((item) => {
-        return item.name === v;
-      });
-      this.changeImageLayers(index);
-    },
-
-    multiPointToLine(arr) {
-      var geojsonTemp = {
-        type: "LineString",
-        coordinates: arr,
-      };
-      // 空间数据转换
-      const flyData = formatWKT.convert(geojsonTemp);
-      const polygonArr = [];
-      polygonArr.push({
-        coords: flyData,
-        id: new Date().getDate,
-      });
-      return polygonArr;
-    },
-    //根据wkt返回长度或面积单位米
-    getAreaByWkt: function (
-      wkt,
-      obj = { radius: 6378137, projection: "EPSG:4326" }
-    ) {
-      var geom = new WKT().readGeometry(wkt);
-      var output = 0;
-      if (geom instanceof Polygon || geom instanceof MultiPolygon) {
-        output = getArea(geom, obj);
-      } else if (
-        geom instanceof LineString ||
-        geom instanceof MultiLineString
-      ) {
-        output = getLength(geom, obj);
-      }
-      return output;
-    },
-    //根据wkt返回点位对象
-    getFeatureByWKT(wkt) {
-      return new WKT().readGeometryFromText(wkt);
-    },
-    getCoordinatesByWkt(wkt) {
-      let feature = this.getFeatureByWKT(wkt);
-      return feature.getCoordinates();
-    },
-    getDrawVector: function () {
-      if (!this.trackPlayBackObj.drawVector) {
-        this.trackPlayBackObj.drawVector = new VectorLayer({
-          name: "trackLayer",
-          source: new VectorSource(),
-          zIndex: 1000,
-        });
-        this.map.getLayers().insertAt(1, this.trackPlayBackObj.drawVector);
-      }
-      return this.trackPlayBackObj.drawVector;
-    },
-    checkIsInArea(point, boundaryLine) {
-      let inArea = false;
-      if (isArray(boundaryLine) && boundaryLine.length) {
-        for (let index = 0; index < boundaryLine.length; index++) {
-          const wkt = boundaryLine[index];
-
-          inArea = this.judgeIsIntersectsCoordinate(
-            this.getBufferWkt(wkt, this.trackPlayBackObj.buffer),
-            point
-          );
-          if (inArea) {
-            break;
-          }
-        }
-      } else if (boundaryLine) {
-        inArea = this.judgeIsIntersectsCoordinate(
-          this.getBufferWkt(boundaryLine, this.trackPlayBackObj.buffer),
-          point
-        );
-      } else {
-        inArea = true;
-      }
-      return inArea;
-    },
-    //判断责任区内外点位样式
-    checkPointStyle(point) {
-      //Point(118,28)
-      let style = this.checkIsInArea(
-        new WKT().writeGeometry(point),
-        this.trackPlayBackObj.areaBoundaryLine
-      )
-        ? new olStyle({
-            image: new olStyleIcon({
-              anchor: [0.5, 1],
-              scale: 0.8,
-              src: require("./image/pointhighlights-green.png"),
-            }),
-          })
-        : new olStyle({
-            image: new olStyleIcon({
-              anchor: [0.5, 1],
-              scale: 0.8,
-              src: require("./image/pointhighlights-red.png"),
-            }),
-          });
-      return style;
-    },
-    checkLineStyle() {
-      let style = new olStyle({
-        fill: new olStyleFill({
-          color: "rgba(255, 0, 0, 0.5)",
-        }),
-        stroke: new olStyleStroke({
-          color: "red",
-          width: 3,
-        }),
-      });
-      return style;
-    },
-    //添加线
-    addLine: function (point1, point2) {
-      var drawVector = this.getDrawVector();
-      let style = this.checkLineStyle();
-      if (point1 && point2) {
-        var line = new LineString([point1, point2]);
-        var feature = new Feature({
-          geometry: line,
-        });
-        feature.setStyle(style);
-        drawVector.getSource().addFeature(feature);
-      } else if (point1) {
-        var feature0 = drawVector.getSource().getFeatures()[0];
-        if (feature0) {
-          feature0.getGeometry().appendCoordinate(point1);
-        }
-      }
-    },
-    //添加点位
-    addPoint: function (point) {
-      var drawVector = this.getDrawVector();
-      var point = new Point(point);
-      let style = this.checkPointStyle(point);
-      var feature = new Feature({
-        geometry: point,
-      });
-      feature.setStyle(style);
-      drawVector.getSource().addFeature(feature);
-    },
-    calculateRotation: function (start, end) {
-      let dx = end[0] - start[0];
-      let dy = end[1] - start[1];
-      let rotation = Math.atan2(dy, dx) * (180 / Math.PI);
-      return rotation;
-    },
-    changeDirection: function (point1, point2) {
-      if (point1[0] - point2[0] > 0) {
-        this.trackPlayBackObj.showLeft = true;
-      } else {
-        this.trackPlayBackObj.showLeft = false;
-      }
-    },
-    loadTimeAndLength(index) {
-      this.trackPlayBackObj.nowDifTime =
-        index > -1
-          ? this.trackPlayBackObj.difTimeList[index]
-          : this.trackPlayBackObj.difTime;
-      this.trackPlayBackObj.nowLength =
-        index > -1
-          ? this.trackPlayBackObj.lengthList[index]
-          : this.trackPlayBackObj.length;
-    },
-    moveFeature: function (event) {
-      var vectorContext = event.vectorContext;
-      var index = this.trackPlayBackObj.index;
-      var date = this.trackPlayBackObj.date;
-      let timeIndex = this.trackPlayBackObj.timeIndex; //获取时间轴下标
-      var newPoints = this.trackPlayBackObj.newPoints;
-      if (index >= newPoints.length) {
-        this.stopAnimation();
-        return;
-      }
-      var frameState = event.frameState;
-      this.loadTrackPosition(newPoints[index]);
-      this.loadTimeAndLength(index);
-      if (this.trackPlayBackObj.drawType === "point") {
-        this.addPoint(newPoints[index]);
-      } else if (this.trackPlayBackObj.drawType === "line") {
-        if (index == 1) {
-          this.addLine(newPoints[0], newPoints[1]);
-        } else if (index > 1) {
-          this.addLine(newPoints[index]);
-        }
-      }
-      if (index > 0) {
-        var rotation = this.calculateRotation(
-          newPoints[index - 1],
-          newPoints[index]
-        );
-        let imgType = this.trackPlayBackObj.imgType;
-        if (imgType == "people") {
-          this.changeDirection(newPoints[index - 1], newPoints[index]);
-        } else if (imgType == "uav") {
-          this.trackPlayBackObj.imgDeg = -rotation;
-        }
-      }
-      if (this.trackPlayBackObj.ispuse == 0) {
-        var t = frameState.time - date;
-        if (t / this.trackPlayBackObj.speed > index - timeIndex) {
-          //开始下标减去时间轴下标判断动画重新开始执行步骤
-          this.trackPlayBackObj.index = this.trackPlayBackObj.index + 1;
-          this.trackPlayBackObj.timeRate =
-            this.trackPlayBackObj.difTimeList[index].toFixed(2) * 1;
-          // ((index / newPoints.length) * 100) | 0;
-        }
-      }
-    },
-    changeTimeRate(val) {
-      var drawVector = this.getDrawVector();
-      drawVector.getSource().clear(); //清空视图
-      let marks = this.trackPlayBackObj.marks;
-      let arr = Object.keys(marks).map((key) => key);
-      let index = marks[this.findNearestNumber(arr, val)].index; //查找根据点击位置查找最相近的下标
-      let points = this.trackPlayBackObj.newPoints.slice(0, index);
-      this.stopAnimation();
-      this.trackPlayBackObj.index = index;
-      this.trackPlayBackObj.timeIndex = index; //动画已跳过下标数
-      points.forEach((item) => {
-        //绘制进度条覆盖的点位
-        this.addPoint(item);
-      });
-      this.startAnimation();
-      // console.log(drawVector.getSource().getFeatures());
-    },
-    findNearestNumber(arr, target) {
-      //查找数组内最近似的值
-      return arr.reduce((pre, curr) => {
-        return Math.abs(pre - target) > Math.abs(curr - target) ? curr : pre;
-      });
-    },
-    loadTrackPosition: function (coordinate) {
-      if (!this.trackPlayBackObj.overlay) {
-        const imgType = this.trackPlayBackObj.imgType;
-        const imgObj = {
-          people: {
-            widthOffeset: 64 / 2,
-            heightOffeset: 68,
-          },
-          uav: {
-            widthOffeset: 32 / 2,
-            heightOffeset: 32 / 2,
-          },
-        };
-        var widthOffeset = imgObj[imgType].widthOffeset;
-        var heightOffeset = imgObj[imgType].heightOffeset;
-        this.trackPlayBackObj.overlay = new Overlay({
-          position: [0, 0],
-          positioning: "center-bottom",
-          element: this.$refs[`map-${imgType}`],
-          //stopEvent: false,
-          offset: [-widthOffeset, -heightOffeset],
-        });
-        this.map.addOverlay(this.trackPlayBackObj.overlay);
-      }
-      this.trackPlayBackObj.overlay.setPosition(coordinate);
-    },
-    //停止轨迹回放动画
-    stopAnimation: function (mapID) {
-      this.trackPlayBackObj.index = 0;
-      this.trackPlayBackObj.date = 0;
-      this.trackPlayBackObj.tempDate = 0;
-      this.trackPlayBackObj.timeRate = this.trackPlayBackObj.difTime;
-      this.loadTimeAndLength();
-      this.map.un("postcompose", this.moveFeature);
-      clearInterval(this.trackPlayBackObj.inter);
-      this.trackPlayBackObj.inter = null;
-    },
-    checkTimeMarks() {
-      let marks = {};
-      let timeList = this.trackPlayBackObj.difTimeList;
-      timeList.forEach((item, index) => {
-        // console.log(index);
-        marks[item] = {
-          index,
-        };
-      });
-      this.trackPlayBackObj.marks = marks;
-      return marks;
-    },
-    DealPoints: function (points) {
-      var newPoints = [];
-      points.forEach((item, i) => {
-        var currLng = parseFloat(item[0]);
-        var currLat = parseFloat(item[1]);
-        newPoints.push([currLng, currLat]);
-
-        if (i + 1 == points.length) {
-          return false;
-        }
-        var nextLng = parseFloat(points[i + 1][0]);
-        var nextLat = parseFloat(points[i + 1][1]);
-
-        var diffLng = nextLng - currLng;
-        var diffLat = nextLat - currLat;
-
-        var currParamsLng = 0;
-        var currParamsLat = 0;
-
-        var base = 0.0001;
-
-        currParamsLng = 0.0001;
-        currParamsLat = (diffLat / diffLng) * 0.0001;
-
-        if (diffLng < diffLat) {
-          currParamsLng = (diffLng / diffLat) * 0.0001;
-          currParamsLat = 0.0001;
-        }
-        if (currParamsLng < 0) {
-          currParamsLng = -currParamsLng;
-        }
-
-        if (diffLat > 0) {
-          if (currParamsLat < 0) {
-            currParamsLat = -currParamsLat;
-          }
-        } else {
-          if (currParamsLat > 0) {
-            currParamsLat = -currParamsLat;
-          }
-        }
-        if (diffLng == 0) {
-          currParamsLng = 0;
-          currParamsLat = 0.0001;
-        }
-
-        if (diffLat == 0) {
-          currParamsLng = 0.0001;
-          currParamsLat = 0;
-        }
-
-        if (diffLng > 0) {
-          currLng = currLng + currParamsLng;
-          currLat = currLat + currParamsLat;
-          while (currLng < nextLng) {
-            newPoints.push([currLng, currLat]);
-
-            currLng = currLng + currParamsLng;
-            currLat = currLat + currParamsLat;
-          }
-        } else if (diffLng < 0) {
-          currLng = currLng - currParamsLng;
-          currLat = currLat + currParamsLat;
-          while (currLng > nextLng) {
-            newPoints.push([currLng, currLat]);
-            currLng = currLng - currParamsLng;
-            currLat = currLat + currParamsLat;
-          }
-        } else {
-          currLng = currLng + currParamsLng;
-          currLat = currLat + currParamsLat;
-          while (currLat < nextLat) {
-            newPoints.push([currLng, currLat]);
-            currLng = currLng + currParamsLng;
-            currLat = currLat + currParamsLat;
-          }
-        }
-      });
-      return newPoints;
-    },
-    changeSpeed: function () {
-      this.trackPlayBackObj.speed = (100 - this.trackPlayBackObj.rate) * 10;
-    },
-    refreshAnimation: function () {
-      this.trackPlayBackObj.speed = (100 - this.trackPlayBackObj.rate) * 10;
-      this.trackPlayBackObj.timeIndex = 0; //重置时间轴下标
-      this.stopAnimation();
-      if (this.trackPlayBackObj.drawVector) {
-        this.trackPlayBackObj.drawVector.getSource().clear();
-      }
-      this.startAnimation();
-    },
-    startAnimation: function () {
-      if (
-        this.trackPlayBackObj.date == undefined ||
-        this.trackPlayBackObj.date == 0
-      ) {
-        this.trackPlayBackObj.date = new Date().getTime();
-      }
-      if (
-        this.trackPlayBackObj.tempDate != undefined &&
-        this.trackPlayBackObj.tempDate != 0
-      ) {
-        this.trackPlayBackObj.date =
-          this.trackPlayBackObj.date +
-          (new Date().getTime() - this.trackPlayBackObj.tempDate);
-      }
-      this.trackPlayBackObj.ispuse = 0;
-      var lines = new LineString(this.trackPlayBackObj.newPoints);
-      var extent = lines.getExtent();
-      this.fitByExtent(extent, true, {
-        padding: this.trackPlayBackObj.padding || [100, 100, 100, 100],
-        fit: true,
-      });
-      this.map.on("postcompose", this.moveFeature);
-      this.map.render();
-      this.trackPlayBackObj.inter = setInterval(() => {
-        this.map.render();
-      }, this.trackPlayBackObj.speed);
-    },
-    //是否显示虚拟点位，平滑移动
-    checkPoints(arr) {
-      return this.trackPlayBackObj.showDeal
-        ? this.DealPoints(arr)
-        : this.trackPlayBackObj.arrData;
-    },
-    //加载巡护轨迹
-    trackPlayBackInit(data) {
-      var arr = [];
-      this.trackPlayBackObj.difTime =
-        data.difTime * 1 ||
-        ((new Date() - new Date(data.startTime)) / 1000 / 60 / 60).toFixed(2) *
-          1; //巡护时长
-      this.trackPlayBackObj.difTimeList = data.difTimeList || [];
-      this.trackPlayBackObj.length = data.length; //巡护距离
-      this.trackPlayBackObj.startTime = data.startTime; //巡护开始时间
-      this.trackPlayBackObj.endTime = data.endTime || parseTime(new Date()); //巡护结束时间
-      this.trackPlayBackObj.arrData = [];
-      this.trackPlayBackObj.speed = (100 - this.trackPlayBackObj.rate) * 10;
-      let points = data.patrolRecordRouteLine || [];
-      //data = data.reverse();
-      points.forEach((wkt) => {
-        var fea = new WKT().readGeometryFromText(wkt);
-        arr.push(fea.getCoordinates());
-        this.trackPlayBackObj.arrData.push(fea.getCoordinates());
-      });
-      this.trackPlayBackObj.newPoints = this.checkPoints(arr);
-      this.checkTimeAndLength();
-      this.startAnimation();
-    },
-    checkTimeAndLength() {
-      //计算
-      let difTimeList = [];
-      let lengthList = (this.trackPlayBackObj.lengthList = [0]);
-      if (
-        this.trackPlayBackObj.difTimeList &&
-        this.trackPlayBackObj.difTimeList.length
-      ) {
-        this.trackPlayBackObj.difTimeList.forEach((item) => {
-          difTimeList.push(
-            (new Date(item) - new Date(this.trackPlayBackObj.startTime)) /
-              1000 /
-              60 /
-              60
-          );
-        });
-      }
-      this.trackPlayBackObj.newPoints.forEach((newPoint, index) => {
-        let length = this.trackPlayBackObj.newPoints.length;
-        //每个点位时长换算,有返回时间及无返回
-        if (
-          !this.trackPlayBackObj.difTimeList ||
-          !this.trackPlayBackObj.difTimeList.length
-        ) {
-          difTimeList.push((this.trackPlayBackObj.difTime / length) * index);
-        }
-        //每个点位距离换算
-        if (index > 0) {
-          let oldPoint = this.trackPlayBackObj.newPoints[index - 1];
-          lengthList[index] =
-            lengthList[index - 1] +
-            this.getAreaByWkt(
-              new WKT().writeGeometry(new LineString([oldPoint, newPoint]))
-            ) /
-              1000;
-        } else if (index == length - 1) {
-          lengthList.push(this.trackPlayBackObj.length);
-        }
-      });
-      this.trackPlayBackObj.difTimeList = difTimeList;
-    },
-    //加载轨迹回放数据
-    async loadTrackPlayBackData(obj, trackData) {
-      let id = obj.id;
-      this.trackPlayBackObj = Object.assign(this.trackPlayBackObj, obj);
-      if (id) {
-        let res = await patrol.patrolForestryUserinfo("route", "get", {
-          id,
-        });
-        let data = res.data;
-        if (data.patrolRecordRouteLine.length) {
-          this.trackPlayBackInit(data);
-        }
-      } else {
-        this.trackPlayBackInit(trackData);
-      }
-    },
-    changeControl(bool) {
-      this.trackPlayBackObj.showControl = bool;
-    },
-    freeMomory(key) {
-      if (this.drawLayerObj[key].getSource() instanceof ClusterSource) {
-        this.drawLayerObj[key].getSource().getSource().clear();
-        this.drawLayerObj[key].getSource().clear();
-      } else {
-        this.drawLayerObj[key].getSource().clear();
-      }
-      delete this.drawLayerObj[key];
-    },
-    //销毁、清除内存
-    destroy() {
-      for (const key in this.drawLayerObj) {
-        if (Object.hasOwnProperty.call(this.drawLayerObj, key)) {
-          this.freeMomory(key);
-        }
-      }
-      this.map = null;
-      this.view = null;
-      this.draw = null;
-      this.snap = null;
-      if (this.trackPlayBackObj?.inter) {
-        clearInterval(this.trackPlayBackObj.inter);
-        this.trackPlayBackObj.inter = null;
-        this.trackPlayBackObj = null;
-      }
-    },
-
-    // 初始化加载地图
-    initMap: function () {
-      //debugger;
-      this.view = new View({
-        projection: getProjection("EPSG:4326"), //坐标系EPSG:4326
-        center: this.defaultMap.center, //中心点坐标
-        minZoom: this.defaultMap.minZoom, //最小级别
-        maxZoom: this.defaultMap.maxZoom,
-        zoom: this.defaultMap.zoom,
-        // extent: this.defaultMap.extent, //范围限制
-      });
-      // 当需要复制其他地图的时候传这个copyMAp
-      let view = null;
-      if (this.copyMap) {
-        view = this.copyMap.map.getView();
-      }
-      this.map = new Map({
-        layers: [],
-        view: view || this.view,
-        target: this.id,
-        controls: [],
-        interactions: defaultInteractions({
-          pinchRotate: false, // 移动端禁止地图旋转
-          doubleClickZoom: false, //禁止双击放大地图
-        }),
-      });
-      //是否需要比例尺
-      if (this.showBaseLayer) {
-        this.addBaseLayer();
-        this.addScaleLint(); //添加比例尺函数
-      } else {
-        this.addBaseLayer();
-      }
-    },
-
-    addLayer(map, obj) {
-      map = map || this.map;
-      const layer = obj.layer;
-      const position = obj.position;
-      // 有设置位置就插入到指定位置，没有这添加在顶部
-      if (obj.position != null) {
-        const layersArray = map.getLayers();
-        layersArray.insertAt(position, layer);
-      } else {
-        map.addLayer(layer);
-      }
-      /* if (obj.singleClick && typeof (obj.singleClick) == 'function') {
-          myMap.event.singleClick(layer, obj.singleClick);
-      } */
-    },
-
-    //显示分屏
-    showDouble() {
-      this.mapDouble = true;
-
-      this.toolData["double_1_layerObj"] = {};
-      this.toolData["double_2_layerObj"] = {};
-
-      const currParam = this.defaultMap.baseLayers[this.baseLayerIndex];
-      const currLayer = this.initBaseLayer(currParam);
-
-      this.toolData["double_1_layerObj"][currParam.name] = currLayer;
-      this.toolData["double_2_layerObj"][currParam.name] = currLayer;
-
-      this.doubleView = new View({
-        projection: getProjection("EPSG:4326"), //坐标系EPSG:4326
-        center: this.defaultMap.center, //中心点坐标
-        minZoom: this.defaultMap.minZoom, //最小级别
-        maxZoom: this.defaultMap.maxZoom,
-        zoom: this.defaultMap.zoom,
-        // extent: this.defaultMap.extent, //范围限制
-      });
-
-      this.$nextTick(() => {
-        this.doubleMap1 = new Map({
-          layers: [
-            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
-          ],
-          // view: this.doubleView,
-          view: this.view,
-          target: "double_1",
-          controls: [],
-        });
-        this.doubleMap2 = new Map({
-          layers: [
-            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
-          ],
-          // view: this.doubleMap1.getView(),
-          view: this.view,
-          target: "double_2",
-          controls: [],
-        });
-
-        this.doubleIndex1 = 0;
-        this.doubleIndex2 = 1;
-
-        const layer_1 = this.defaultMap.imageLayers[this.doubleIndex1];
-        const temp_1 = this.initImageLayer(layer_1);
-        const layer_2 = this.defaultMap.imageLayers[this.doubleIndex2];
-        const temp_2 = this.initImageLayer(layer_2);
-
-        this.doubleTitle1 = layer_1.title;
-        this.doubleTitle2 = layer_2.title;
-
-        this.toolData["double_1_layerObj"][layer_1.name] = temp_1;
-        this.toolData["double_2_layerObj"][layer_2.name] = temp_2;
-
-        this.addLayer(this.doubleMap1, { layer: temp_1, position: 1 });
-        this.addLayer(this.doubleMap2, { layer: temp_2, position: 1 });
-
-        //显示注记图层
-        if (this.showNoteLayer) {
-          const noteLayer = this.baseLayerObj[currParam.noteName];
-          this.addLayer(this.doubleMap1, { layer: noteLayer, position: 10 });
-          this.addLayer(this.doubleMap2, { layer: noteLayer, position: 10 });
-          this.toolData["double_1_layerObj"][currParam.noteName] = noteLayer;
-          this.toolData["double_2_layerObj"][currParam.noteName] = noteLayer;
-        }
-
-        for (const k in this.drawLayerObj) {
-          if (Object.hasOwnProperty.call(this.drawLayerObj, k)) {
-            const v = this.drawLayerObj[k];
-            if (v.values_.visible) {
-              this.addLayer(this.doubleMap1, {
-                layer: v,
-                position: v.values_.zIndex,
-              });
-              this.addLayer(this.doubleMap2, {
-                layer: v,
-                position: v.values_.zIndex,
-              });
-              this.toolData["double_1_layerObj"][k] = v;
-              this.toolData["double_2_layerObj"][k] = v;
-            }
-          }
-        }
-
-        for (const k in this.wmsLayerObj) {
-          if (Object.hasOwnProperty.call(this.wmsLayerObj, k)) {
-            const v = this.wmsLayerObj[k];
-            if (v.values_.visible) {
-              this.addLayer(this.doubleMap1, {
-                layer: v,
-                position: v.values_.zIndex,
-              });
-              this.addLayer(this.doubleMap2, {
-                layer: v,
-                position: v.values_.zIndex,
-              });
-              this.toolData["double_1_layerObj"][k] = v;
-              this.toolData["double_2_layerObj"][k] = v;
-            }
-          }
-        }
-      });
-    },
-
-    //关闭分屏
-    hideDouble() {
-      for (const k in this.toolData["double_1_layerObj"]) {
-        if (Object.hasOwnProperty.call(this.toolData["double_1_layerObj"], k)) {
-          const v = this.toolData["double_1_layerObj"][k];
-          this.doubleMap1.removeLayer(v);
-        }
-      }
-      for (const k in this.toolData["double_2_layerObj"]) {
-        if (Object.hasOwnProperty.call(this.toolData["double_2_layerObj"], k)) {
-          const v = this.toolData["double_2_layerObj"][k];
-          this.doubleMap2.removeLayer(v);
-        }
-      }
-      this.toolData["double_1_layerObj"] = {};
-      this.toolData["double_2_layerObj"] = {};
-      this.doubleView = null;
-      this.doubleMap1 = null;
-      this.doubleMap2 = null;
-      this.mapDouble = false;
-      this.$emit("hideDouble");
-    },
-
-    // 打开分屏切换选项
-    handleDoubleLayers(tag) {
-      if (tag === 1) {
-        this.doubleActive1 = !this.doubleActive1;
-        this.doubleActive2 = false;
-      } else {
-        this.doubleActive1 = false;
-        this.doubleActive2 = !this.doubleActive2;
-      }
-    },
-
-    //分屏切换
-    changeDoubleLayers(map, tag, index) {
-      const layer = this.defaultMap.imageLayers[index];
-      const layerMap = this.toolData[`double_${tag}_layerObj`][layer.name];
-
-      if (tag === 1) {
-        this.doubleTitle1 = layer.title;
-        this.doubleIndex1 = index;
-      } else {
-        this.doubleTitle2 = layer.title;
-        this.doubleIndex2 = index;
-      }
-
-      for (let key in this.toolData[`double_${tag}_layerObj`]) {
-        if (key !== layer.name && key.indexOf("image_layer_") == 0) {
-          this.toolData[`double_${tag}_layerObj`][key].setVisible(false);
-        }
-      }
-
-      if (layerMap) {
-        layerMap.setVisible(true);
-      } else {
-        const temp = this.initImageLayer(layer);
-        this.toolData[`double_${tag}_layerObj`][layer.name] = temp;
-        this.addLayer(map, { layer: temp, position: 2 });
-      }
-    },
 
     //显示新卷帘
     showRollerNew() {
@@ -3100,49 +2629,13 @@ export default {
       this.rollerMap2 = null;
       this.mapRollerNew = false;
     },
-
-    //新卷帘切换
-    rollerSelectChange(data, map, tag) {
-      const index = this.defaultMap.imageLayers.findIndex((item) => {
-        return item.name === data;
-      });
-
-      // return;
-      const layer = this.defaultMap.imageLayers[index];
-      const layerMap = this.toolData[`rollernew_${tag}_layerObj`][layer.name];
-
-      if (tag === 1) {
-        this.rollerIndexNew1 = index;
-      } else {
-        this.rollerIndexNew2 = index;
-      }
-
-      for (let key in this.toolData[`rollernew_${tag}_layerObj`]) {
-        if (key !== layer.name && key.indexOf("image_layer_") == 0) {
-          this.toolData[`rollernew_${tag}_layerObj`][key].setVisible(false);
-        }
-      }
-
-      if (layerMap) {
-        layerMap.setVisible(true);
-      } else {
-        const temp = this.initImageLayer(layer);
-        this.toolData[`rollernew_${tag}_layerObj`][layer.name] = temp;
-        this.addLayer(map, { layer: temp, position: 2 });
-      }
+    // 测距关闭按钮
+    rangingClose() {
+      this.rangingMap = null;
+      this.drawLayerObj1 = [];
+      this.mapRanging = false;
+      this.radioSelect = "";
     },
-
-    rollerYearChange(data, type) {
-      this.yearChangeFunction(
-        data,
-        this.toolData.rollernew_2_layerObj,
-        this.toolData.rollernew_1_layerObj,
-        this.rollerMap2,
-        this.rollerMap1,
-        type
-      );
-    },
-
     // 显示卷帘
     showRoller(year = this.year) {
       this.mapRoller = true;
@@ -3238,7 +2731,6 @@ export default {
       this.toolData["roller_layerObj"] = {};
       this.rollerMap = null;
       this.mapRoller = false;
-      this.$emit("hideRoller");
     },
 
     // 打开卷帘切换选项
@@ -3316,14 +2808,6 @@ export default {
       if (this.rollerMap) {
         this.rollerMap.render();
       }
-    },
-
-    bindRollerEvent1() {
-      // this.rollerMap2.updateSize();
-      // this.rollerWidth = this.$refs.rollerBox2.offsetHeight;
-      // if (this.rollerMap2) {
-      //   this.rollerMap2.render();
-      // }
     },
 
     bindRoller(layer) {
@@ -3593,11 +3077,9 @@ export default {
         index: layObj.index || "",
         title: layObj.title || "",
         visible: layObj.visible || true,
-        //定义图层的数据源，可以是XYZ、WMTS、OSM等
         source: new XYZ({
           //url: layObj.url,
           tileUrlFunction: function (tileCoord) {
-            // 返回一个字符串，表示瓦片的 URL 地址。
             let url = layObj.url;
             let z = tileCoord[0];
             let x = tileCoord[1];
@@ -3617,14 +3099,11 @@ export default {
     // 添加基础图层
     addBaseLayer: function (map = this.map) {
       //if (!this.isCustom) {
-      // 这里是默认底图用哪种，一共有3种放在this.defaultMap.baseLayers中
       let baseParam = this.defaultMap.baseLayers[this.baseLayerIndex];
-      // 这里就是吧baseParm数据进行一个初始化成为一个瓦片图层
       let baseLayer = this.initBaseLayer(baseParam);
       this.addLayer(map, { layer: baseLayer, position: 1 });
       baseParam.active = true;
       this.imageLayerInfo = baseParam;
-      //加载图层图层信息存放，图层名称：图层信息
       this.baseLayerObj[baseParam.name] = baseLayer;
 
       // 添加注记图层
@@ -3632,11 +3111,70 @@ export default {
 
       // 获取影像图层
       this.getImageList();
+      /* } else {
+        let layer = this.initBaseLayer(
+          this.defaultMap.baseLayers[1]
+        );
+
+        //openlayer 像素转换类，可以直接当做source使用
+        const raster = new RasterSource({
+          sources: [
+            //传入图层，这里是天地图矢量图或者天地图矢量注记
+            layer,
+          ],
+          //这里设置为image类型，与官方示例不同，优化速度
+          operationType: 'image',
+          operation: function (pixels, data) {
+            //执行颜色转换方法，注意，这里的方法需要使用lib引入进来才可以使用
+            let reverseFunc = function (pixelsTemp) {
+              //蓝色
+              for (var i = 0; i < pixelsTemp.length; i += 4) {
+                var r = pixelsTemp[i];
+                var g = pixelsTemp[i + 1];
+                var b = pixelsTemp[i + 2];
+                //运用图像学公式，设置灰度值
+                var grey = r * 0.3 + g * 0.59 + b * 0.11;
+                //将rgb的值替换为灰度值
+                pixelsTemp[i] = grey;
+                pixelsTemp[i + 1] = grey;
+                pixelsTemp[i + 2] = grey;
+
+                //基于灰色，设置为蓝色，这几个数值是我自己试出来的，可以根据需求调整
+                pixelsTemp[i] = 55 - pixelsTemp[i];
+                pixelsTemp[i + 1] = 255 - pixelsTemp[i + 1];
+                pixelsTemp[i + 2] = 305 - pixelsTemp[i + 2];
+              }
+            };
+            reverseFunc(pixels[0].data);
+            return pixels[0];
+          },
+          //线程数量
+          threads: 10,
+          //允许operation使用外部方法
+        //   lib: {
+        //     reverseFunc: reverseFunc,
+        //   }
+        });
+
+        //创建新图层，注意，必须使用 ImageLayer
+        let layer2 = new ImageLayer({
+          name: "天地图矢量图层",
+          source: raster,
+        });
+        this.map.addLayer(layer2);
+
+        this.imageLayerInfo = this.defaultMap.baseLayers[1];
+
+        this.getImageList();
+      } */
+
+      // 添加比例尺
+      this.addScaleLint();
     },
 
     // 添加注记图层
     addNoteLayer(map = this.map) {
-      // 开启注记图层，组件传参控制，默认开启
+      // 开启注记图层
       if (!this.showNoteLayer) {
         return;
       }
@@ -3644,11 +3182,11 @@ export default {
       // 获取地图所有图层
       const layers = map.getLayers();
 
-      // 注记图层参数，baseLayers中两个url一个是地图一个就是对应的注记
+      // 注记图层参数
       const baseParam = this.defaultMap.baseLayers[this.baseLayerIndex];
 
       let noteLayer = {};
-      //判断已经加载的图层中是否含有注记层，有则删除，无则添加
+
       if (this.baseLayerObj[baseParam.noteName]) {
         // 根据名称获取图层信息
         noteLayer = this.baseLayerObj[baseParam.noteName];
@@ -3672,7 +3210,7 @@ export default {
           type: 1,
           active: true,
         };
-        // 这里进行图层初始化
+
         noteLayer = this.initBaseLayer(noteParam);
 
         this.baseLayerObj[baseParam.noteName] = noteLayer;
@@ -3720,41 +3258,38 @@ export default {
     async getImageList() {
       const list = [];
 
-      //这里就是查询后端接口获取this.defaultMap.imageLayers的下拉数据，现在林草资源这个接口没有，所以外部调用记得传false，使用默认值
-      // if (this.imageFetch) {
-      //   const api = require("@/api/data");
-      //   const query = {};
-      //   query.status = 1;
-      //   const res = await api.fetchMapImageList(query);
+      if (this.imageFetch) {
+        const api = require("@/api/data");
+        const query = {};
+        query.status = 1;
+        const res = await api.fetchMapImageList(query);
 
-      //   res.data.forEach((v, k) => {
-      //     const temp = {};
-      //     temp.index = 0;
-      //     temp.url = v.mapUrl;
-      //     temp.name = "image_layer_" + k;
-      //     temp.title = v.biName;
-      //     temp.type = parseInt(v.imageType);
-      //     temp.active = false;
-      //     temp.origin = v.origin;
-      //     temp.time = v.imageTime;
-      //     temp.no = "GS(2020)3758号";
-      //     list.push(temp);
-      //   });
+        res.data.forEach((v, k) => {
+          const temp = {};
+          temp.index = 0;
+          temp.url = v.mapUrl;
+          temp.name = "image_layer_" + k;
+          temp.title = v.biName;
+          temp.type = parseInt(v.imageType);
+          temp.active = false;
+          temp.origin = v.origin;
+          temp.time = v.imageTime;
+          temp.no = "GS(2020)3758号";
+          list.push(temp);
+        });
 
-      //   // 赋值影像列表
-      //   this.defaultMap.imageLayers = list;
-      // }
+        // 赋值影像列表
+        this.defaultMap.imageLayers = list;
+      }
 
       // 赋值中心点和显示范围
-      // 这里从用户信息中取出范围点位，包含四个元素 [minx, miny, maxx, maxy]
-      // if (JSON.stringify(this.$store.getters.extent) !== "{}") {
-      //   this.defaultMap.extent = this.$store.getters.extent;
-      //   // 这里调用方法就可以获取中心点位了
-      //   this.defaultMap.center = new getCenter(this.defaultMap.extent);
-      //   this.fitByExtent(this.$store.getters.extent, true, {
-      //     padding: [100, 0, 100, 0],
-      //   });
-      // }
+      if (JSON.stringify(this.$store.getters.extent) !== "{}") {
+        this.defaultMap.extent = this.$store.getters.extent;
+        this.defaultMap.center = new getCenter(this.defaultMap.extent);
+        this.fitByExtent(this.$store.getters.extent, true, {
+          padding: [100, 0, 100, 0],
+        });
+      }
     },
 
     // 初始化影像图层
@@ -3973,15 +3508,29 @@ export default {
     },
 
     // 地图放大
-    zoomIn: function () {
-      let zoom = this.view.getZoom();
-      this.view.setZoom(zoom + 1);
+    zoomIn(zoomNum) {
+      // this.terrainSmallSelect = 2;
+      let zoom = zoomNum || this.view.getZoom() + 2;
+      if (this.mapAnimation) {
+        this.view.animate({
+          zoom,
+        });
+      } else {
+        this.view.setZoom(zoom);
+      }
     },
 
     // 地图缩小
-    zoomOut: function () {
-      let zoom = this.view.getZoom();
-      this.view.setZoom(zoom - 1);
+    zoomOut(zoomNum) {
+      // this.terrainSmallSelect = 1;
+      let zoom = zoomNum || this.view.getZoom() - 2;
+      if (this.mapAnimation) {
+        this.view.animate({
+          zoom,
+        });
+      } else {
+        this.view.setZoom(zoom);
+      }
     },
 
     updateSize: function () {
@@ -4001,9 +3550,11 @@ export default {
 
     loadFeatures: function (coordsArr, textField, coordField, coordsStyle) {
       let features = [];
-      for (let i = 0; i < coordsArr.length; i++) {
+      let coordsArrLength = coordsArr?.length;
+      for (let i = 0; i < coordsArrLength; i++) {
         let coordsObj = coordsArr[i];
         let showText = coordsObj[textField];
+        let cloneNum = coordsObj.cloneNum || 1;
         let feature = this.showCoordinate(
           coordsObj[coordField],
           null,
@@ -4027,11 +3578,21 @@ export default {
         if (feature) {
           feature.setStyle(this.setCoordStyle(style));
           features.push(feature);
+          if (cloneNum > 1) {
+            let geometry = feature.getGeometry();
+            for (let num = 1; num < cloneNum; num++) {
+              // 循环值过大时需要考虑性能提升
+              features.push(
+                new Feature({
+                  geometry,
+                })
+              );
+            }
+          }
         }
       }
       return features;
     },
-
     // 添加坐标图层，根据坐标添加图层
     addCoordinateLayer: function (dataOption) {
       /*
@@ -4048,15 +3609,23 @@ export default {
       let name = dataOption.name; //图层名称
       let coordsArr = dataOption.coordsArr; //图层数组对象[{coord:"point(112 26)",olstyle:obj,id:'1',...}]coord:wkt坐标，id;数据唯一标识，点击事件绑定用，style点、线、面的独立样式
       let coordsStyle = dataOption.coordsStyle; //绘制的样式，若coordsArr未自定义olstyle，使用公共的样式去设置
+      let heatMapStyle = dataOption.heatMapStyle || {};
 
       if (this.drawLayerObj[name]) {
         this.drawLayerObj[name].getSource().clear();
       } else {
-        this.drawLayerObj[name] = new VectorLayer({
-          source: new VectorSource(),
-          name: name,
-        });
-
+        if (dataOption.isHeatMap) {
+          this.drawLayerObj[name] = new Heatmap({
+            source: new VectorSource(),
+            name: name,
+            ...heatMapStyle,
+          });
+        } else {
+          this.drawLayerObj[name] = new VectorLayer({
+            source: new VectorSource(),
+            name: name,
+          });
+        }
         if (dataOption.position) {
           var layersArray = this.map.getLayers();
           layersArray.insertAt(dataOption.position, this.drawLayerObj[name]);
@@ -4085,17 +3654,6 @@ export default {
           dataOption.fitOptions
         );
       }
-
-      if (dataOption.moveMap && features.length > 0) {
-        // 获取当前地图的缩放级别
-        let currentZoom = this.map.getView().getZoom();
-
-        // 移动地图视角到指定位置
-        this.map.getView().animate({
-          center: this.drawLayerObj[name].getSource().getExtent(), // 指定位置的经纬度
-          zoom: currentZoom, // 保持当前的缩放级别
-        });
-      }
       //console.log(this.drawLayerObj);
       //console.log('typeof', typeof dataOption.vectorEventFun)
       //要素点击事件的方法
@@ -4105,56 +3663,8 @@ export default {
         dataOption
       );
 
-      if (dataOption.isSelect) {
-        this.addSelectFunction(this.drawLayerObj[name], dataOption.callback);
-      }
-
       //console.log(this.drawLayerObj[name]);
       return this.drawLayerObj[name];
-    },
-    addSelectFunction(layer, callback) {
-      let _this = this;
-      // 获取渲染器
-      let renderer = _this.map.getRenderer();
-
-      // 设置willReadFrequently属性为true
-      renderer.willReadFrequently = true;
-
-      this.selectDataInteraction = new Select({
-        condition: click,
-        style: null,
-        layers: [layer],
-      });
-      // 监听select事件
-      this.selectDataInteraction.on("select", function (e) {
-        console.log("select", e);
-        if (e.selected.length > 0) {
-          const feature = e.selected[0];
-          const layers = _this.map.getLayers().getArray();
-          for (const i in layers) {
-            const source = layers[i].getSource();
-            if (source instanceof VectorSource) {
-              const features = source.getFeatures();
-              if (features.length > 0) {
-                for (const j in features) {
-                  if (features[j] === feature) {
-                    // source.removeFeature(feature);
-                    // _this.map.removeLayer(layers[i]);
-                    // return layers[i];
-                    callback(features[j]);
-                    _this.selectDataInteraction.getFeatures().clear();
-                    // _this.selectDataInteraction.setActive(false);
-                    // _this.draw.setActive(false)
-                  }
-                }
-              }
-            }
-          }
-          // 停止默认行为
-          e.preventDefault();
-        }
-      });
-      this.map.addInteraction(this.selectDataInteraction);
     },
     getBufferGeometry: function (wkt, buffer) {
       var geom = new WKT().readGeometry(wkt);
@@ -4181,13 +3691,25 @@ export default {
       return geomTransform;
     },
     //获取根据wkt值返回缓冲区的wkt
-    getBufferWkt: function (wkt, buffer) {
+    getBufferWkt: function (wkt, buffer, mapType) {
       var geometry = this.getBufferGeometry(
         wkt,
         buffer || this.trackPlayBackObj.buffer
       );
-      var bugfferWkt = new WKT().writeGeometry(geometry);
-      return bugfferWkt;
+
+      if (mapType == "circle") {
+        let circle = this.getCircleGeometry(
+          new getCenter(geometry.getExtent()),
+          getWidth(geometry.getExtent()) / 2
+        );
+        return circle;
+      } else {
+        var bugfferWkt = new WKT().writeGeometry(geometry);
+        return bugfferWkt;
+      }
+    },
+    getCircleGeometry(center, width) {
+      return new Circle(center, width);
     },
     // 判断巡护轨迹点是否在责任区或网格内
     judgeIsIntersectsCoordinate: function (wkt1, wkt2) {
@@ -4251,7 +3773,16 @@ export default {
       // 添加单选工具
       this.map.addInteraction(this.select);
     },
-
+    //计算中心点
+    geometryFunc(feature) {
+      var geometry = feature.getGeometry();
+      if (geometry.getType() === "Point") {
+        return feature.getGeometry();
+      } else if (geometry.getType() === "MultiPolygon") {
+        return new Point(new getCenter(geometry.getExtent()));
+      }
+      return geometry.getInteriorPoint();
+    },
     //
     addClusterCoordinateArryLayer: function (dataOption) {
       //聚合显示
@@ -4279,14 +3810,13 @@ export default {
         coordField,
         coordsStyle
       );
-
       let clusterSource = new ClusterSource({
         distance: distance,
         source: new VectorSource({
           features: features,
         }),
+        geometryFunction: this.geometryFunc, //获取多边形内点的方法
       });
-
       // else{
       this.drawLayerObj[name] = new VectorLayer({
         source: clusterSource,
@@ -4320,6 +3850,7 @@ export default {
               if (clusterStyle.text) {
                 param.text.fill = clusterStyle.text.fill;
                 param.text.font = clusterStyle.text.font;
+                param.text.offsetY = clusterStyle.text.offsetY;
               }
             }
             //coordsStyle.circle.radius=radius;
@@ -4329,7 +3860,6 @@ export default {
           return style;
         },
       });
-
       this.map.addLayer(this.drawLayerObj[name]);
       this.drawLayerObj[name].getSource().addFeatures(features);
 
@@ -4343,25 +3873,13 @@ export default {
           dataOption.fitOptions
         );
       }
-      if (dataOption.moveMap && features.length > 0) {
-        // 获取当前地图的缩放级别
-        let currentZoom = this.map.getView().getZoom();
-
-        // 移动地图视角到指定位置
-        this.map.getView().animate({
-          center: this.drawLayerObj[name].getSource().getExtent(), // 指定位置的经纬度
-          zoom: currentZoom, // 保持当前的缩放级别
-        });
-      }
       //要素点击事件的方法
       //debugger;
       //this.bindEventForVector(this.drawLayerObj[name], dataOption.vectorEventFun);
 
       /* this.defaultMap.eventObjForVector['click'] = this.drawLayerObj[name];
         this.unBindEventForVector('click', name); */
-      if (dataOption.isSelect) {
-        this.addSelectFunction(this.drawLayerObj[name], dataOption.callback);
-      }
+
       let eventTypeList = (
         dataOption.layerEventType || this.defaultMap.layerEventType
       ).split(",");
@@ -4372,7 +3890,7 @@ export default {
         if (eventFun) {
           const key = this.map.on(clickType, (e) => {
             this.drawLayerObj[name]
-              .getFeatures(e.pixel)
+              ?.getFeatures(e.pixel)
               .then((clickedFeatures) => {
                 //
                 if (clickedFeatures.length) {
@@ -4381,6 +3899,11 @@ export default {
                   if (features) {
                     if (features.length > 1) {
                       //返回聚合点的总数，大于1，地图级
+                      if (this.defaultMap.maxZoom <= this.getZoom()) {
+                        //聚合达到地图最大层级，可关联addPopup弹出对应点位选择
+                        eventFun.call(e, e.coordinate, features);
+                        return;
+                      }
                       this.zoomIn();
 
                       //根据点位，进行定位方法
@@ -4390,9 +3913,9 @@ export default {
                           wktArr.push(v.values_.attr[coordField]);
                         }
                       });
-                      this.fitByWKT(wktArr);
+                      this.fitByWKT(wktArr, true, dataOption.childFitOption);
 
-                      eventFun.call(e, "", null);
+                      eventFun.call(e, "clusterClick", null);
                     } else if (features.length == 1) {
                       let feature = features[0];
                       eventFun.call(e, e.coordinate, feature);
@@ -4417,6 +3940,8 @@ export default {
                   // }else if(features.length==1){
 
                   // }
+                } else {
+                  eventFun.call(e, "", null);
                 }
               });
           });
@@ -4538,10 +4063,10 @@ export default {
       }
     },
     // 重置地图到默认中心点及缩放
-    resetView: function (data) {
+    resetView: function (data = {}) {
       this.view.animate({
-        center: this.defaultMap.center,
-        zoom: this.defaultMap.zoom,
+        center: data.center || this.defaultMap.center,
+        zoom: data.zoom || this.defaultMap.zoom,
       });
     },
 
@@ -4559,7 +4084,16 @@ export default {
       }
       if (!this.drawLayerObj[name]) {
         this.drawLayerObj[name] = new VectorLayer({
-          source: new VectorSource(),
+          source: data.wkt
+            ? new VectorSource({
+                //根据wkt值配置初始点线面
+                features: [
+                  new Feature({
+                    geometry: new WKT().readGeometry(data.wkt),
+                  }),
+                ],
+              })
+            : new VectorSource(),
           name: name,
         });
         this.drawLayerObj[name].setStyle(this.setCoordStyle(style));
@@ -4653,7 +4187,7 @@ export default {
                 );
                 /* this.drawLayerObj[name].globalCoordinate = returnData; */
                 /* console.log(returnData) */
-                callback.call(_this.drawLayerObj[name], returnData, features);
+                callback.call(_this.drawLayerObj[name], returnData);
 
                 /* const geometry = e.features.getGeometry()
                 let pointArr = geometry.getCoordinates()
@@ -4670,9 +4204,7 @@ export default {
     setDrawLayerActice: function (obj) {
       var name = obj.name;
       if (this.drawLayerObj[name]) {
-        if (this.draw) {
-          this.draw.setActive(obj.active == true ? true : false);
-        }
+        this.draw.setActive(obj.active == true ? true : false);
       }
     },
 
@@ -5025,7 +4557,6 @@ export default {
     },
 
     addPopup: function (popupObj) {
-      console.log("dd:", popupObj);
       let popup_ = null;
       if (popupObj.img) {
         //判断弹框是否全部是图片
@@ -5043,8 +4574,8 @@ export default {
       //document.getElementById("popup-content").innerHTML = popupObj.content;
       this.popupData = Object.assign({}, popupObj);
       document.getElementById(`popup_${this.id}`).style.display = "block";
-      let popupWidth = 342;
-      let popupHeight = 180;
+      let popupWidth = 424;
+      let popupHeight = 194;
       //框默认高度 + 获取文本内容渲染高度 + 默认40像素间隔
       popupHeight =
         popupHeight + 40 * Math.ceil(this.popupData.content.length / 2) + 40;
@@ -5074,18 +4605,15 @@ export default {
       } else {
         this.popupLayer.setOffset([-(popupWidth / 2), -popupHeight]);
       }
+
       this.map.addOverlay(this.popupLayer);
       this.popupLayer.setPosition(popupObj.coords);
       this.popupLoading = false;
-      this.$nextTick(() => {
-        this.$refs.popupContent.scrollTop = 0;
-      });
     },
 
     closePopup: function (callback) {
       //console.log('关闭的popupLayer', this.popupLayer);
       if (this.popupLayer) {
-        this.popupData = {};
         this.popupLayer.setPosition(null);
         document.getElementById(`popup_${this.id}`).style.display = "none";
 
@@ -5095,96 +4623,6 @@ export default {
           delete this.drawLayerObj["light_layer"];
         }
       }
-    },
-
-    // 切换图层基础
-    changeBaseLayers(index) {
-      // 切换地图图层选择样式
-      this.baseLayerIndex = index;
-
-      let baseParam = this.defaultMap.baseLayers[index];
-
-      this.defaultMap.baseLayers.forEach((v) => {
-        if (v.name === baseParam.name) {
-          v.active = true;
-        } else {
-          v.active = false;
-        }
-      });
-
-      for (let key in this.baseLayerObj) {
-        if (key !== baseParam.name) {
-          this.baseLayerObj[key].setVisible(false);
-        }
-      }
-
-      if (this.baseLayerObj[baseParam.name]) {
-        this.baseLayerObj[baseParam.name].setVisible(baseParam.active);
-      } else {
-        const baseLayer = this.initBaseLayer(baseParam);
-        this.baseLayerObj[baseParam.name] = baseLayer;
-        this.addLayer(this.map, { layer: baseLayer, position: 1 });
-      }
-
-      this.addNoteLayer();
-
-      // this.imageLayerInfo = baseParam;
-    },
-
-    showNoteLayerChange() {
-      this.addNoteLayer(this.map);
-    },
-    // 添加注记图层
-    addNoteLayer(map = this.map) {
-      // 开启注记图层
-      if (!this.showNoteLayer) {
-        // 注记图层参数
-        const baseParam = this.defaultMap.baseLayers[this.baseLayerIndex];
-        if (this.baseLayerObj[baseParam.noteName]) {
-          this.baseLayerObj[baseParam.noteName].setVisible(false);
-        }
-        return;
-      }
-
-      // 获取地图所有图层
-      const layers = map.getLayers();
-
-      // 注记图层参数
-      const baseParam = this.defaultMap.baseLayers[this.baseLayerIndex];
-
-      let noteLayer = {};
-
-      if (this.baseLayerObj[baseParam.noteName]) {
-        // 根据名称获取图层信息
-        noteLayer = this.baseLayerObj[baseParam.noteName];
-        noteLayer.setVisible(true);
-
-        // 获取地图所有图层数组
-        const layersArray = layers.getArray();
-
-        layersArray.forEach((v, k) => {
-          // 获取注记图层的键值，并移除
-          if (v.get("name") == baseParam.noteName) {
-            layers.removeAt(k);
-          }
-        });
-      } else {
-        let noteParam = {
-          index: 0,
-          url: baseParam.noteUrl,
-          name: baseParam.noteName,
-          title: "天地图注记",
-          type: 1,
-          active: true,
-        };
-
-        noteLayer = this.initBaseLayer(noteParam);
-
-        this.baseLayerObj[baseParam.noteName] = noteLayer;
-      }
-
-      // 在所有图层最后重新插入注记图层
-      layers.insertAt(layers.values_.length + 1, noteLayer);
     },
 
     destroyPopup: function () {
@@ -5202,6 +4640,9 @@ export default {
     handlePopupBtn: function (v) {
       if (v.type === "dialog") {
         this.$emit(v.dialog.name, v.dialog.visible, v.dialog.params);
+        return;
+      } else if (v.type === "function") {
+        v.function(v.params);
         return;
       }
       this.showVideoConnection(v.data);
@@ -5230,16 +4671,95 @@ export default {
       eventTypeList.forEach((clickType) => {
         this.unBindEventForVector(clickType, "wmslayerevent");
         let self = this;
-        let key = this.map.on(clickType, function (e) {
+        let key = this.map.on(clickType, function (evt) {
           let layersInfo = {};
           for (let name in self.wmsLayerObj) {
             if (self.wmsLayerObj[name].getVisible()) {
               let url = self.getWmsUrlInfo(
-                e.coordinate,
+                evt.coordinate,
                 self.wmsLayerObj[name],
                 layobj.param
               );
               layersInfo[name] = url;
+            }
+          }
+          for (let name in self.wmtsLayerObj) {
+            if (self.wmtsLayerObj[name].getVisible()) {
+              let wmtslayer = self.wmtsLayerObj[name];
+              let view = self.view;
+              let layer = wmtslayer.layerOption;
+              var source = wmtslayer.getSource();
+              var resolution = view.getResolution();
+              var tilegrid = source.getTileGrid();
+              var tileResolutions = tilegrid.getResolutions();
+              var zoomIdx,
+                diff = Infinity;
+              for (var i = 0; i < tileResolutions.length; i++) {
+                var tileResolution = tileResolutions[i];
+                var diffP = Math.abs(resolution - tileResolution);
+                if (diffP < diff) {
+                  diff = diffP;
+                  zoomIdx = i;
+                }
+                if (tileResolution < resolution) {
+                  break;
+                }
+              }
+              var tileSize = tilegrid.getTileSize(zoomIdx);
+              var tileOrigin = tilegrid.getOrigin(zoomIdx);
+              var fx =
+                (evt.coordinate[0] - tileOrigin[0]) /
+                (resolution * tileSize[0]);
+              var fy =
+                (tileOrigin[1] - evt.coordinate[1]) /
+                (resolution * tileSize[1]);
+              var tileCol = Math.floor(fx);
+              var tileRow = Math.floor(fy);
+              var tileI = Math.floor((fx - tileCol) * tileSize[0]);
+              var tileJ = Math.floor((fy - tileRow) * tileSize[1]);
+              var matrixIds = tilegrid.getMatrixIds()[zoomIdx];
+              var matrixSet = source.getMatrixSet();
+
+              var url = layer.baseUrl + "?";
+              let defaultWmtsParams = {
+                VERSION: "1.0.0",
+                LAYER: layer.layer,
+                STYLE: layer.style,
+                TILEMATRIX: layer.matrixIds,
+                TILEMATRIXSET: layer.matrixSet,
+                SERVICE: "WMTS",
+                FORMAT: layer.format,
+              };
+              Object.keys(defaultWmtsParams).forEach((param) => {
+                if (param.toUpperCase() == "TILEMATRIX") {
+                  url = url + "TILEMATRIX=" + matrixIds + "&";
+                } else {
+                  url = url + param + "=" + defaultWmtsParams[param] + "&";
+                }
+              });
+              url =
+                url +
+                "SERVICE=WMTS&REQUEST=GetFeatureInfo" +
+                "&INFOFORMAT=" +
+                layer.infoFormat +
+                "&TileCol=" +
+                tileCol +
+                "&TileRow=" +
+                tileRow +
+                "&I=" +
+                tileI +
+                "&J=" +
+                tileJ;
+
+              if (url) {
+                for (let name2 in self.wmtsLayerObj) {
+                  if (self.wmtsLayerObj[name2].getVisible()) {
+                    if (name == name2) {
+                      layersInfo[name2] = url;
+                    }
+                  }
+                }
+              }
             }
           }
           if (
@@ -5248,7 +4768,7 @@ export default {
             )
           ) {
             let eventFun = layobj[clickType] || layobj.layerEventFun;
-            eventFun.call(e, e.coordinate, layersInfo);
+            eventFun.call(evt, evt.coordinate, layersInfo);
           }
         });
       });
@@ -5289,14 +4809,14 @@ export default {
     getWmsUrlInfo: function (coordinate, layer, param) {
       if (param) {
         param = Object.assign(
-          { INFO_FORMAT: "application/json", FEATURE_COUNT: 50 },
+          { INFO_FORMAT: "application/json", FEATURE_COUNT: 10 },
           param
         );
       } else {
-        param = { INFO_FORMAT: "application/json", FEATURE_COUNT: 50 };
+        param = { INFO_FORMAT: "application/json", FEATURE_COUNT: 10 };
       }
 
-      //param = Object.assign( { 'INFO_FORMAT': 'application/json', 'FEATURE_COUNT': 50 },param) ;//$.extend({},, param);
+      //param = Object.assign( { 'INFO_FORMAT': 'application/json', 'FEATURE_COUNT': 10 },param) ;//$.extend({},, param);
       var source = layer.getSource();
       //console.log(source)
       var url = source.getFeatureInfoUrl(
@@ -5344,6 +4864,16 @@ export default {
       return result;
     },
 
+    fitByPoint(point, zoom) {
+      let center = !isArray(point) ? this.getCoordinatesByWkt(point) : point;
+      if (this.mapAnimation) {
+        this.view.animate({
+          zoom: zoom || this.view.getZoom(),
+          center,
+        });
+      } else {
+      }
+    },
     fitByExtent: function (extent, changeZoom, fitoptions, map) {
       //debugger
       map = map || this.map;
@@ -5355,16 +4885,29 @@ export default {
           maxZoom: zoom,
           minZoom: zoom,
           constrainResolution: true,
-        }); //对象合并，相当于jquery的$.extend({}, fitoptions || {}, { maxZoom: zoom, minZoom: zoom, constrainResolution: true });
-        // 缩放平移操作，移动到中心点
-        this.view.fit(extent, fitoptions);
+        }); //对象合并，相当于jquery的$.extend({}, fitoptions || {}, { maxZoom: zoom, minZoom: zoom, constrainResolution: true }); // 缩放平移操作，移动到中心点
+      }
+      if (this.mapAnimation) {
+        this.view.animate({
+          zoom: fitoptions.zoom || zoom,
+          center: new getCenter(extent),
+        });
       } else {
         this.view.fit(extent, fitoptions);
       }
     },
-
     //设置坐标样式
     setCoordStyle: function (olStyleObj) {
+      let styleArr = [];
+      if (isArray(olStyleObj)) {
+        olStyleObj.forEach((style) => styleArr.push(this.getStyleArr(style)));
+        styleArr = styleArr.flat();
+      } else {
+        styleArr = this.getStyleArr(olStyleObj);
+      }
+      return styleArr;
+    },
+    getStyleArr(olStyleObj) {
       let style = {};
       var styleArr = [];
       if (olStyleObj) {
@@ -5467,7 +5010,6 @@ export default {
       }
       return styleArr;
     },
-
     showCoordinate: function (coords, olStyle, attrObj) {
       /*
           coords:wkt坐标
@@ -5518,65 +5060,6 @@ export default {
       return extent;
     },
 
-    // 更新地图宽度
-    updateSizeFunction() {
-      setTimeout(() => {
-        this.map.updateSize();
-      }, 10);
-    },
-
-    // 全屏功能
-    fullScreen() {
-      this.isFullScreen = true;
-      this.terrainSmallSelect = 0;
-      let mapBasis = this.$refs["mapBasis"];
-      mapBasis.style.width = window.innerWidth + "px";
-      mapBasis.style.height = window.innerHeight + "px";
-      mapBasis.style.zIndex = 1002; // 左侧侧边栏设置了1001
-      mapBasis.style.position = "fixed";
-      mapBasis.style.top = "0";
-      mapBasis.style.right = "0";
-      this.updateSizeFunction();
-    },
-
-    // 全屏按钮点击事件
-    fullScreenClick() {
-      if (this.isFullScreen) {
-        // 关闭全屏
-        this.isFullScreen = false;
-        this.terrainSmallSelect = -1;
-        let mapBasis = this.$refs["mapBasis"];
-        mapBasis.style.width = "100%";
-        mapBasis.style.height = "100%";
-        mapBasis.style.zIndex = 0;
-        mapBasis.style.position = "relative";
-        this.updateSizeFunction();
-        this.$emit("fullScreenClickOff", this.drawWktData);
-      } else {
-        this.isFullScreen = true;
-        this.terrainSmallSelect = 0;
-        this.fullScreen();
-      }
-    },
-    // 地图放大
-    zoomIn() {
-      this.terrainSmallSelect = 2;
-      let zoom = this.view.getZoom();
-      this.view.setZoom(zoom + 1);
-    },
-
-    // 地图缩小
-    zoomOut() {
-      this.terrainSmallSelect = 1;
-      let zoom = this.view.getZoom();
-      this.view.setZoom(zoom - 1);
-    },
-
-    // 地形模式切换框是否显示按钮点击事件
-    isShowTerrainBigBoxClick() {
-      this.terrainSmallSelect = this.terrainSmallSelect == 3 ? -1 : 3;
-    },
-
     //删除图层，根据图层名字
     removeLayerByName: function (layerName) {
       //根据图层名称移除图层
@@ -5593,7 +5076,7 @@ export default {
       let layer;
       if (layers) {
         let layArr = layers.getArray();
-        for (let index in layArr) {
+        for (let index = 0; index < layArr.length; index++) {
           let item = layArr[index];
           if (item.getLayers) {
             for (let node in item.getLayers().getArray()) {
@@ -5612,37 +5095,15 @@ export default {
       }
       return layer;
     },
-
-    situationClose() {
-      this.situationData.show = false;
-    },
-
-    // 敏感数据显示隐藏
-    isShowSecretFunction(data, start, end) {
-      if (!data) {
-        return;
-      }
-      end = end == -1 ? data.length : end;
-      let dataText = JSON.parse(JSON.stringify(data));
-      let xingnum = end - start;
-      let xing = "";
-      for (let i = 0; i < xingnum; i++) {
-        xing += "*";
-      }
-      let text;
-      text = dataText.replace(dataText.substring(start, end), xing); // 利用
-
-      return text;
-    },
   },
 };
 </script>
-<style lang="scss" scoped>
+<style scoped>
 /* #map {
   height: 100vh;
   width: 100vw;
 } */
-$app-list-primary-color: #0052d9;
+
 .map-layer {
   position: relative;
   overflow: hidden;
@@ -5651,7 +5112,6 @@ $app-list-primary-color: #0052d9;
 .map-panel {
   width: 100%;
   height: 100%;
-  background-color: #fff;
   /* height: 100vh; */
 }
 .ol-zoom {
@@ -5915,18 +5375,18 @@ $app-list-primary-color: #0052d9;
   background: #fff;
 }
 .map-double .close {
-  background-color: #fff;
+  background-color: rgba(2, 11, 38, 0.9);
   width: 36px;
   height: 36px;
   line-height: 36px;
   text-align: center;
-  color: #000;
+  color: #fff;
   font-size: 24px;
   font-weight: bold;
   position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 132;
+  top: 0;
+  right: 0;
+  z-index: 1;
   cursor: pointer;
 }
 .map-double .item {
@@ -5968,7 +5428,6 @@ $app-list-primary-color: #0052d9;
   height: 100%;
   width: 100%;
   z-index: 9;
-  background-color: #fff;
 }
 .map-roller #roller {
   width: 100%;
@@ -5984,18 +5443,18 @@ $app-list-primary-color: #0052d9;
   background-color: rgba(38, 92, 133, 0.3);
 }
 .map-roller .close {
-  background-color: #fff;
+  background-color: rgba(2, 11, 38, 0.9);
   width: 36px;
   height: 36px;
   line-height: 36px;
   text-align: center;
-  color: #000;
+  color: #fff;
   font-size: 24px;
   font-weight: bold;
   position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 132;
+  top: 0;
+  right: 0;
+  z-index: 10;
   cursor: pointer;
 }
 .map-roller .point {
@@ -6048,17 +5507,28 @@ $app-list-primary-color: #0052d9;
   color: white; */
 }
 </style>
-<style lang="scss" scoped>
+<style lang="scss">
+.ol-tooltip {
+  position: relative;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  color: white !important;
+  padding: 4px 8px;
+  opacity: 0.7;
+  white-space: nowrap;
+  font-size: 12px;
+  cursor: default;
+  user-select: none;
+}
+
+.ol-tooltip-measure {
+  opacity: 1;
+  font-weight: bold;
+}
 .map-roller .point .el-slider__runway {
   background-color: transparent;
 }
 .map-roller .point .el-slider__bar {
-  background-color: transparent;
-}
-.map-roller-year .point .el-slider__runway {
-  background-color: transparent;
-}
-.map-roller-year .point .el-slider__bar {
   background-color: transparent;
 }
 .map-people {
@@ -6149,7 +5619,7 @@ $app-list-primary-color: #0052d9;
     width: 1px;
     bottom: 0;
     margin-left: 3px;
-    background-color: rgba(255, 255, 255, 0.4);
+    background-color: rgba(255, 255, 255, 0);
   }
   .el-slider__button-wrapper {
     top: 0;
@@ -6181,32 +5651,39 @@ $app-list-primary-color: #0052d9;
   margin-left: -7px;
   left: 50%;
 }
-.ol-tooltip {
-  position: relative;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 4px;
-  color: white;
-  padding: 4px 8px;
-  opacity: 0.7;
-  white-space: nowrap;
-  font-size: 12px;
-  cursor: default;
-  user-select: none;
-}
 
-.ol-tooltip-measure {
-  opacity: 1;
-  font-weight: bold;
+.map-search-box {
+  position: absolute;
+  top: 30px;
+  left: 10px;
+  z-index: 1;
+  display: flex;
+  background: #fff;
+  border-radius: 3px;
+  padding: 10px;
+  flex-wrap: wrap;
+  .w150 {
+    width: 150px;
+  }
+  .map-box-right {
+    font-size: 14px;
+    color: #666;
+  }
+  .chose-type {
+    width: 80px;
+    margin-right: 10px;
+  }
+  .map-box-bottom {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .address {
+    width: 200px;
+  }
 }
 </style>
 <style lang="scss" scoped>
-// $fontColor: #fff;
-// $backgroundColor: rgba(2, 11, 38, 1);
-// $borderColor: 1px solid rgba(101, 216, 227, 0.4);
-$app-list-primary-color: #0052d9;
-$fontColor: #000;
-$backgroundColor: rgba(255, 255, 255, 1);
-$borderColor: 1px solid #dfe6ec;
 .map-ranging {
   position: absolute;
   top: 0px;
@@ -6230,31 +5707,6 @@ $borderColor: 1px solid #dfe6ec;
     right: 10px;
     z-index: 132;
     cursor: pointer;
-  }
-}
-.toolbar {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  .toolbar-check-box {
-    height: 32px;
-    line-height: 32px;
-    // background-color: rgba(2, 11, 38, 0.9);
-    background-color: #fff !important;
-    padding: 0 12px 0 22px;
-    display: flex;
-    align-items: center;
-    .radio-item {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      cursor: pointer;
-      margin-right: 10px;
-    }
   }
 }
 .map-roller-year {
@@ -6342,279 +5794,13 @@ $borderColor: 1px solid #dfe6ec;
     cursor: pointer;
   }
 }
-// 鼠标点击弹出层
-.popup-new {
-  position: absolute;
-  display: none;
-
-  .body {
-    z-index: 9999;
-    width: 342px;
-    // height: 350px;
-    overflow: hidden;
-    position: relative;
-    padding: 12px 16px;
-    // background: rgba(255, 255, 255, 0.8);
-    background: url("./image/point-bg.png") #fff no-repeat;
-
-    // padding: 10px;
-    border-radius: 8px;
-    .hd {
-      overflow: hidden;
-      position: relative;
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-
-      .title {
-        font-family: YouSheBiaoTiHei;
-        font-size: 16px;
-        color: rgba(0, 0, 0, 0.9);
-        line-height: 1;
-        // text-shadow: 0 2px 12px #0a53fa;
-        font-weight: 600;
-      }
-      .close {
-        font-size: 25px;
-        cursor: pointer;
-      }
-    }
-    .bd {
-      margin-top: 15px;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      max-height: 200px;
-      overflow-y: auto;
-      .item {
-        width: 50%;
-        height: 40px;
-        line-height: 40px;
-        border-bottom: 1px solid #e7e7e7;
-        .value {
-          margin-left: 10px;
-        }
-      }
-    }
-    .ft {
-      margin-top: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      .btn {
-        width: 112px;
-        height: 39px;
-        line-height: 39px;
-        text-align: center;
-        border: 1px solid #333;
-        cursor: pointer;
-        border-radius: 2px;
-      }
-    }
+.map-roller-year .point {
+  ::v-deep .el-slider__runway,
+  ::v-deep .el-slider__bar {
+    background-color: transparent;
   }
 }
-.map-basis {
-  position: relative;
-  background-color: #fff;
-  .coordinate-collection {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    width: 268px;
-    // height: 196px;
-    border-radius: 8px;
-    background-color: #fff;
-    padding: 12px 16px 2px 16px;
-    .title {
-      font-size: 16px;
-      color: rgba(0, 0, 0, 0.9);
-      font-weight: 600;
-    }
-    .btn-box {
-      display: flex;
-      margin-top: 12px;
-      .btn-item {
-        width: 32px;
-        height: 32px;
-        background-color: rgba(231, 231, 231, 1);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 12px;
-        border-radius: 3px;
-        cursor: pointer;
-      }
-      .btn-item-click {
-        background-color: $app-list-primary-color;
-        color: #fff;
-      }
-    }
-    .coordinate-form {
-      margin-top: 12px;
-      ::v-deep .el-form-item {
-        margin-bottom: 5px;
-      }
-    }
-  }
-  .terrain-box {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    .box-big {
-      width: 318px;
-      height: 132px;
-      border-radius: 6px;
-      padding: 12px 16px;
-      background-color: #fff;
-      .title-box {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        .title {
-          color: rgba(0, 0, 0, 0.9);
-          font-weight: 600;
-          font-size: 16px;
-        }
-      }
-      .content-box {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        .content-item {
-          width: 66px;
-          height: 66px;
-          margin-top: 12px;
-          border-radius: 6px;
-          overflow: hidden;
-          position: relative;
-          border: 2px solid #fff;
-          cursor: pointer;
-          .img {
-            width: 100%;
-            height: 100%;
-            border-radius: 6px;
-          }
-          .name {
-            position: absolute;
-            left: 0;
-            bottom: 0;
-            font-size: 12px;
-            height: 25px;
-            width: 100%;
-            color: #fff;
-            font-weight: 400;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: rgb(0, 0, 0, 0.2);
-          }
-        }
-        .content-item-on {
-          border: 2px solid $app-list-primary-color;
-        }
-      }
-    }
-    .box-small {
-      width: 148px;
-      height: 40px;
-      border-radius: 4px;
-      padding: 4px;
-      background-color: #fff;
-      margin-top: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      .icon-box {
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        .img {
-          width: 16px;
-          height: 16px;
-        }
-        .img1 {
-          width: 16px;
-          height: 4px;
-        }
-        .img3 {
-          width: 36px;
-          height: 36px;
-        }
-      }
-    }
-  }
-}
-.terrain-box {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  .box-big {
-    width: 318px;
-    height: 132px;
-    border-radius: 6px;
-    padding: 12px 16px;
-    background-color: #fff;
-    .title-box {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      .title {
-        color: rgba(0, 0, 0, 0.9);
-        font-weight: 600;
-        font-size: 16px;
-      }
-    }
-    .content-box {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      .content-item {
-        width: 66px;
-        height: 66px;
-        margin-top: 12px;
-        border-radius: 6px;
-        overflow: hidden;
-        position: relative;
-        border: 2px solid #fff;
-        cursor: pointer;
-        .img {
-          width: 100%;
-          height: 100%;
-          border-radius: 6px;
-        }
-        .name {
-          position: absolute;
-          left: 0;
-          bottom: 0;
-          font-size: 12px;
-          height: 25px;
-          width: 100%;
-          color: #fff;
-          font-weight: 400;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background-color: rgb(0, 0, 0, 0.2);
-        }
-      }
-      .content-item-on {
-        border: 2px solid #0052d9;
-      }
-    }
-  }
-}
-
-.privew {
-  height: 150px;
+.map-roller-year .point .el-slider__bar {
+  background-color: transparent;
 }
 </style>

@@ -7,9 +7,9 @@
  */
 export function handleTree(data, id, parentId, children) {
   const config = {
-    id: id || 'id',
-    parentId: parentId || 'parentId',
-    childrenList: children || 'children'
+    id: id || "id",
+    parentId: parentId || "parentId",
+    childrenList: children || "children",
   };
 
   var childrenListMap = {};
@@ -67,20 +67,20 @@ export function date(type) {
     day: nowDate.getDate(),
     hours: nowDate.getHours(),
     minutes: nowDate.getMinutes(),
-    seconds: nowDate.getSeconds()
+    seconds: nowDate.getSeconds(),
   };
-  const newMonth = date.month >= 10 ? date.month : '0' + date.month;
-  const newDay = date.day >= 10 ? date.day : '0' + date.day;
-  const newHours = date.hours >= 10 ? date.hours : '0' + date.hours;
-  const newMinutes = date.minutes >= 10 ? date.minutes : '0' + date.minutes;
-  const newSeconds = date.seconds >= 10 ? date.seconds : '0' + date.seconds;
-  if (type == 'yyyy-MM-dd HH:mm:ss') {
+  const newMonth = date.month >= 10 ? date.month : "0" + date.month;
+  const newDay = date.day >= 10 ? date.day : "0" + date.day;
+  const newHours = date.hours >= 10 ? date.hours : "0" + date.hours;
+  const newMinutes = date.minutes >= 10 ? date.minutes : "0" + date.minutes;
+  const newSeconds = date.seconds >= 10 ? date.seconds : "0" + date.seconds;
+  if (type == "yyyy-MM-dd HH:mm:ss") {
     return `${date.year}-${newMonth}-${newDay} ${newHours}:${newMinutes}:${newSeconds}`;
-  } else if (type == 'yyyy-MM-dd') {
+  } else if (type == "yyyy-MM-dd") {
     return `${date.year}-${newMonth}-${newDay}`;
-  } else if (type == 'yyyy-MM') {
+  } else if (type == "yyyy-MM") {
     return `${date.year}-${newMonth}`;
-  } else if (type == 'HH:mm:ss') {
+  } else if (type == "HH:mm:ss") {
     return `${newHours}:${newMinutes}:${newSeconds}`;
   }
 }
@@ -90,14 +90,14 @@ export function date(type) {
  * @val {String} // yyyy 或者 yyyy-MM
  */
 export function requestDate(val) {
-  if (!val) return { startTime: '', endTime: '' };
-  const arr = val.split('-');
+  if (!val) return { startTime: "", endTime: "" };
+  const arr = val.split("-");
   if (arr.length == 1) {
-    return { startTime: val + '-01-01', endTime: val + '-12-31' };
+    return { startTime: val + "-01-01", endTime: val + "-12-31" };
   } else {
     const month = arr[1] < 10 ? arr[1].substr(1, 1) : arr[1];
     const day = new Date(arr[0], month, 0).getDate();
-    return { startTime: val + '-01', endTime: val + '-' + day };
+    return { startTime: val + "-01", endTime: val + "-" + day };
   }
 }
 
@@ -107,22 +107,22 @@ export function requestDate(val) {
  * @param {string} icon 值为icon取缩略图,默认为空
  * @param {string} patrolWaitFile 巡林
  */
-export function imgUrl(url, type, icon = '') {
-  if (!url) return '';
+export function imgUrl(url, type, icon = "") {
+  if (!url) return "";
   const originUrl = process.env.VUE_APP_BASE_API
     ? process.env.VUE_APP_BASE_API
     : window.location.origin;
-  return `${originUrl}multimedia/${'show' + icon}/${type}/${url}`;
+  return `${originUrl}multimedia/${"show" + icon}/${type}/${url}`;
 }
 
 // 文件格式
 export const suffixJson = {
-  image: ['.png', '.jpg', '.jpeg'],
-  audio: ['.mp3', '.ogg', '.wav', '.acc', '.vorbis', '.silk', '.m4a'],
-  video: ['.mp4', '.webm', '.avi', '.rmvb', '.3gp', '.flv'],
-  application: ['.docx', '.xlsx', '.pptx', '.pdf'],
-  zip: ['.zip', '.rar', '.7z'],
-  txt: ['.txt']
+  image: [".png", ".jpg", ".jpeg"],
+  audio: [".mp3", ".ogg", ".wav", ".acc", ".vorbis", ".silk", ".m4a"],
+  video: [".mp4", ".webm", ".avi", ".rmvb", ".3gp", ".flv"],
+  application: [".docx", ".xlsx", ".pptx", ".pdf"],
+  zip: [".zip", ".rar", ".7z"],
+  txt: [".txt"],
   // image: ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.bmp', '.pic', '.tif', '.webp'],
   // audio: ['.mp3', '.ogg', '.wav', '.acc', '.vorbis', '.silk', '.m4a'],
   // video: ['.mp4', '.webm', '.avi', '.rmvb', '.3gp', '.flv'],
@@ -133,7 +133,7 @@ export const suffixJson = {
 
 // 根据后缀名判断文件类型
 export function fileType(str) {
-  const idx = str.lastIndexOf('.');
+  const idx = str.lastIndexOf(".");
   str = str.substring(idx, str.length);
   for (const i in suffixJson) {
     if (suffixJson[i].indexOf(str) != -1) return i;
@@ -168,14 +168,14 @@ export function fileType(str) {
 
 // 获取文件后缀名
 function getSuffix(str) {
-  const idx = str.lastIndexOf('.');
+  const idx = str.lastIndexOf(".");
   return str.substring(idx, str.length);
 }
 
 // 动态国际化
 export function translate(type, key) {
   if (!key) return;
-  return this.$t(type + '.' + key);
+  return this.$t(type + "." + key);
 }
 
 // 根据区划等级抽稀
@@ -197,20 +197,20 @@ export function tolerance(areaCode) {
 
 // 手机号加密显示
 export function telEncryption(str) {
-  if (!str) return '';
+  if (!str) return "";
   const reg = /^(\d{3})\d*(\d{4})$/;
-  return str.replace(reg, '$1****$2');
+  return str.replace(reg, "$1****$2");
 }
 
-String.prototype.baseTo = function(nostar) {
-  if (typeof this == 'string') {
+String.prototype.baseTo = function (nostar) {
+  if (typeof this == "string") {
     let str = this;
     str = window.atob(str);
     str = decodeURIComponent(str); // 中文编码问题
     if (!nostar) {
       if ([16, 18].includes(str.length)) {
         const n = (str.length - 6) / 2;
-        str = str.slice(0, n) + '*********' + str.slice(9 + n);
+        str = str.slice(0, n) + "*********" + str.slice(9 + n);
       } else if (str.length == 11) {
         str = telEncryption(str);
       } else {
@@ -223,8 +223,8 @@ String.prototype.baseTo = function(nostar) {
   }
 };
 
-String.prototype.toBase = function() {
-  if (typeof this == 'string') {
+String.prototype.toBase = function () {
+  if (typeof this == "string") {
     let str = this;
     str = encodeURIComponent(str); // 中文编码问题
     str = window.btoa(str);
@@ -234,26 +234,26 @@ String.prototype.toBase = function() {
   }
 };
 
-String.prototype.getAreaLevel = function() {
+String.prototype.getAreaLevel = function () {
   // areaCode.getAreaLevel()
   const obj = { 2: 1, 4: 2, 6: 3, 9: 4, 12: 5, 15: 5 };
   return obj[this.length];
 };
 
-Date.prototype.getOneDay = function(num = 0, type) {
+Date.prototype.getOneDay = function (num = 0, type) {
   // 根据当天传入数值返回,负数为当天前,正数为当天后，默认返回当天,type有值则返回时分秒
   const date = new Date(new Date(this).setDate(new Date(this).getDate() + num));
-  let time = '';
+  let time = "";
   if (type) {
     time =
-      ' ' + date.toLocaleString('chinese', { hour12: false }).split(' ')[1];
+      " " + date.toLocaleString("chinese", { hour12: false }).split(" ")[1];
   }
   return (
     [
       date.getFullYear(),
       String(date.getMonth() + 1 + 100).slice(1),
-      String(date.getDate() + 100).slice(1)
-    ].join('-') + time
+      String(date.getDate() + 100).slice(1),
+    ].join("-") + time
   );
 };
 
@@ -279,13 +279,13 @@ Date.prototype.format = function (format) {
   });
 };
 
-Date.prototype.getOneMonth = function(num = 0) {
+Date.prototype.getOneMonth = function (num = 0) {
   // 根据当月传入数值返回,负数为当月前,正数为当月后,默认返回当月
-  const monthTime = this.getFullYear() + '-' + (this.getMonth() + 1) + '-01';
+  const monthTime = this.getFullYear() + "-" + (this.getMonth() + 1) + "-01";
   const date = new Date(
     new Date(monthTime).setMonth(new Date(monthTime).getMonth() + num)
   );
-  return date.getFullYear() + '-' + String(date.getMonth() + 1 + 100).slice(1);
+  return date.getFullYear() + "-" + String(date.getMonth() + 1 + 100).slice(1);
 };
 
 /** 例如：computedMonth(2022-09-12,-1,'end') 输出：2022-08-31
@@ -296,9 +296,9 @@ Date.prototype.getOneMonth = function(num = 0) {
 export function computedMonth(dateTime, num, type) {
   const monthTime =
     new Date(dateTime).getFullYear() +
-    '-' +
+    "-" +
     (new Date(dateTime).getMonth() + 1) +
-    '-01';
+    "-01";
   const date = new Date(
     new Date(monthTime).setMonth(new Date(monthTime).getMonth() + num)
   );
@@ -308,9 +308,9 @@ export function computedMonth(dateTime, num, type) {
   if (!type) return totalDay;
   const day =
     month - new Date().getMonth() == 1 ? new Date().getDate() : totalDay;
-  const _day = day < 10 ? '0' + day : day;
-  return `${year}-${month < 10 ? '0' + month : month}-${
-    type == 'end' ? _day : '01'
+  const _day = day < 10 ? "0" + day : day;
+  return `${year}-${month < 10 ? "0" + month : month}-${
+    type == "end" ? _day : "01"
   }`;
 }
 
@@ -320,7 +320,7 @@ export function computedMonth(dateTime, num, type) {
 export function getParam(name) {
   const reg = new RegExp(`[?&]${name}=([^&]*)(&|$)`);
   const str = window.location.hash.match(reg);
-  return str ? decodeURIComponent(str[1]) : '';
+  return str ? decodeURIComponent(str[1]) : "";
 }
 
 /** 接口请求对象封装
@@ -330,8 +330,8 @@ export function getParam(name) {
  * @param {string} specifyURL 指定地址
  */
 export function requestObj(url, method, params, specifyURL) {
-  if (['GET', 'DELETE'].includes(method.toUpperCase())) {
-    for (const i in params) url += '/' + params[i];
+  if (["GET", "DELETE"].includes(method.toUpperCase())) {
+    for (const i in params) url += "/" + params[i];
     return { url, method, params: {}, specifyURL };
   }
   return { url, method, data: params, specifyURL };
@@ -342,11 +342,35 @@ export function requestObj(url, method, params, specifyURL) {
  * @param {string} key 指定字段 默认，
  * @param {string} delimiter 分隔符 默认，
  */
-export function montageName(arr, key, delimiter = ',') {
-  let str = '';
+export function montageName(arr, key, delimiter = ",") {
+  let str = "";
   arr.forEach((item, idx) => {
-    const unit = arr.length - idx > 1 ? delimiter : '';
+    const unit = arr.length - idx > 1 ? delimiter : "";
     str += item[key] + unit;
   });
   return str;
+}
+
+// 16进制转成rgb
+export function set16ToRgb(str, opacityNum = 1) {
+  const reg = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+  if (!reg.test(str)) {
+    return;
+  }
+  let newStr = str.toLowerCase().replace(/\#/g, "");
+  const len = newStr.length;
+  if (len == 3) {
+    let t = "";
+    for (let i = 0; i < len; i++) {
+      t += newStr.slice(i, i + 1).concat(newStr.slice(i, i + 1));
+    }
+    newStr = t;
+  }
+  const arr = []; // 将字符串分隔，两个两个的分隔
+  const num = 6;
+  for (let i = 0; i < num; i = i + 2) {
+    const s = newStr.slice(i, i + 2);
+    arr.push(parseInt("0x" + s));
+  }
+  return "rgba(" + arr.join(",") + "," + opacityNum + ")";
 }

@@ -1,6 +1,82 @@
 <template>
   <div class="map-layer" :style="{ height: height }">
     <div :id="id" ref="rootmap" class="map-panel" style="height: 100%" />
+    <!-- 搜索框 -->
+    <div class="map-search-box" v-if="searchForm">
+      <el-select
+        class="chose-type"
+        placeholder="类型"
+        v-model="searchForm.searchType"
+        size="small"
+      >
+        <el-option label="坐标" :value="undefined"></el-option>
+        <el-option label="地址" :value="1"></el-option>
+        <el-option label="区划" :value="2"></el-option>
+      </el-select>
+      <div class="map-box-right">
+        <div v-if="searchForm.searchType == 1">
+          <el-select
+            v-model="searchAreaName"
+            filterable
+            remote
+            reserve-keyword
+            placeholder="请输入区划名称"
+            :remote-method="getAreaList"
+            :loading="loading"
+            clearable
+          >
+            <el-option
+              v-for="item in backAreaList"
+              :key="item.areaCode"
+              :label="item.areaName"
+              :value="item.areaCode"
+              @click.native="getAreaDetail(item)"
+              @keyup.enter.native="getAreaDetail(item)"
+            />
+          </el-select>
+          <!-- <el-button type="primary" size="small" class="ml-10">查询</el-button> -->
+        </div>
+        <div v-else-if="searchForm.searchType == 2">
+          <area-select
+            ref="area-filter"
+            :is-all-tree="true"
+            :value="mapSearchQuery.areaCode"
+            @change="areaChange"
+            placeholder="请选择行政区划"
+            class="filter-item mr-10 w150"
+          />
+        </div>
+        <div v-else>
+          <div class="mb-10">
+            <span>经度:</span>
+            <el-input
+              v-model="mapSearchQuery.lon"
+              size="small"
+              placeholder="请输入经度"
+              clearable
+              class="w150 ml-5"
+            ></el-input>
+          </div>
+          <div>
+            <span>纬度:</span>
+            <el-input
+              v-model="mapSearchQuery.lat"
+              size="small"
+              placeholder="请输入纬度"
+              clearable
+              class="w150 ml-5"
+            ></el-input>
+          </div>
+          <el-button
+            type="primary"
+            size="small"
+            class="mt-10 fr"
+            @click="fitByPoint"
+            >查询</el-button
+          >
+        </div>
+      </div>
+    </div>
     <!-- 轨迹回放控制器 -->
     <!-- <div class="speed-control" v-if="trackPlayBackObj.showControl">
       <el-slider
@@ -56,6 +132,75 @@
         <div>{{ trackPlayBackObj.nowLength | isFixed }}千米</div>
       </div> -->
     </div>
+    <!-- 分屏对比 -->
+    <div v-if="mapDoubleNew" class="map-double">
+      <div class="item">
+        <div class="map-select">
+          <div class="i-select" @click="handleDoubleLayers(1)">
+            <div class="hd">
+              <i class="icon">
+                <svg-icon icon-class="international" />
+              </i>
+              <i class="text">{{ versionSelectData[doubleTitleIndex1].name }}</i>
+              <i
+                class="arrow"
+                :class="[
+                  doubleActive1 ? 'el-icon-arrow-down' : 'el-icon-arrow-up',
+                ]"
+              />
+            </div>
+            <div class="bd" :class="{ active: doubleActive1 }">
+              <ul>
+                <li
+                  v-for="(v, k) in versionSelectData"
+                  :key="k"
+                  :class="{ active: doubleTitleIndex1 === k }"
+                  @click="changeDoubleLayersNew(doubleMap1, 1, k)"
+                >
+                  {{ v.name }}
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div id="double_1" ref="double_1" />
+      </div>
+      <div class="item">
+        <div class="map-select">
+          <div class="i-select" @click="handleDoubleLayers(2)">
+            <div class="hd">
+              <i class="icon">
+                <svg-icon icon-class="international" />
+              </i>
+              <i class="text">{{ versionSelectData[doubleTitleIndex2].name }}</i>
+              <i
+                class="arrow"
+                :class="[
+                  doubleActive2 ? 'el-icon-arrow-up' : 'el-icon-arrow-down',
+                ]"
+              />
+            </div>
+            <div class="bd" :class="{ active: doubleActive2 }">
+              <ul>
+                <li
+                  v-for="(v, k) in versionSelectData"
+                  :key="k"
+                  :class="{ active: doubleTitleIndex2 === k }"
+                  @click="changeDoubleLayersNew(doubleMap2, 2, k)"
+                >
+                  {{ v.name }}
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div id="double_2" ref="double_2" />
+      </div>
+      <div class="line" />
+      <div class="close" @click="hideDoubleNew"><i class="el-icon-close" /></div>
+    </div>
+
+
     <!-- 分屏 -->
     <div v-if="mapDouble" class="map-double">
       <div class="item">
@@ -73,7 +218,7 @@
               <i
                 class="arrow"
                 :class="[
-                  doubleActive1 ? 'el-icon-arrow-down' : 'el-icon-arrow-up'
+                  doubleActive1 ? 'el-icon-arrow-down' : 'el-icon-arrow-up',
                 ]"
               />
             </div>
@@ -104,7 +249,7 @@
               <i
                 class="arrow"
                 :class="[
-                  doubleActive2 ? 'el-icon-arrow-up' : 'el-icon-arrow-down'
+                  doubleActive2 ? 'el-icon-arrow-up' : 'el-icon-arrow-down',
                 ]"
               />
             </div>
@@ -130,7 +275,96 @@
 
     <!-- 对比 -->
     <div class="map-compare" />
-
+    <!-- 卷帘新 -->
+    <div v-if="mapRollerNew" class="map-roller-year">
+      <el-slider
+        v-model="rollerValue"
+        class="point"
+        :show-tooltip="false"
+      />
+      <div class="mask" :style="{ left: rollerValue + '%' }" />
+      <div ref="roller1" class="roller-box1">
+        <div
+          id="roller1"
+          :style="{ height: roller2Height + 'px', width: roller2Width + 'px' }"
+        />
+      </div>
+      <div
+        ref="rollerBox2"
+        class="roller-box2"
+        :style="{ width: rollerValue + '%' }"
+      >
+        <el-select
+          v-model="rollerBardata2"
+          placeholder=""
+          :popper-class="'map-select-popper'"
+          class="roller-select2 ml-10"
+          @change="rollerSelectChange($event, rollerMap2, 2)"
+        >
+          <el-option
+            v-for="(v, k) in defaultMap.imageLayers"
+            :key="k"
+            :label="v.title"
+            :value="v.name"
+          />
+        </el-select>
+        <el-select
+          v-if="isShowRollerYear"
+          v-model="yearValue2"
+          placeholder="请选择"
+          :popper-class="'map-select-popper'"
+          class="roller-year-select2"
+          :style="{ left: rollerValue + '%' }"
+          @change="rollerYearChange($event, 2)"
+        >
+          <el-option
+            v-for="(item) in options"
+            :key="item.yearNo"
+            :label="item.yearNo"
+            :value="item.id + ''"
+          />
+        </el-select>
+        <div
+          id="roller2"
+          ref="roller2"
+          :style="{ height: roller2Height + 'px', width: roller2Width + 'px' }"
+        />
+      </div>
+      <el-select
+        v-model="rollerBardata1"
+        placeholder=""
+        :popper-class="'map-select-popper'"
+        class="roller-select1 ml-10"
+        :style="{ left: rollerValue + '%' }"
+        @change="rollerSelectChange($event, rollerMap1, 1)"
+      >
+        <el-option
+          v-for="(v, k) in defaultMap.imageLayers"
+          :key="k"
+          :label="v.title"
+          :value="v.name"
+        />
+      </el-select>
+      <el-select
+        v-if="isShowRollerYear"
+        v-model="yearValue1"
+        placeholder="请选择"
+        :popper-class="'map-select-popper'"
+        class="roller-year-select1"
+        :style="{ left: rollerValue + '%' }"
+        @change="rollerYearChange($event, 1)"
+      >
+        <el-option
+          v-for="(item) in options"
+          :key="item.yearNo"
+          :label="item.yearNo"
+          :value="item.id + ''"
+        />
+      </el-select>
+      <div class="close" @click="rollerNewClose">
+        <i class="el-icon-close" />
+      </div>
+    </div>
     <!-- 卷帘 -->
     <div v-if="mapRoller" class="map-roller">
       <div id="roller" ref="roller" />
@@ -154,7 +388,7 @@
                 v-if="!year"
                 class="arrow"
                 :class="[
-                  rollerActive1 ? 'el-icon-arrow-down' : 'el-icon-arrow-up'
+                  rollerActive1 ? 'el-icon-arrow-down' : 'el-icon-arrow-up',
                 ]"
               />
             </div>
@@ -183,7 +417,7 @@
                 v-if="!year"
                 class="arrow"
                 :class="[
-                  rollerActive2 ? 'el-icon-arrow-down' : 'el-icon-arrow-up'
+                  rollerActive2 ? 'el-icon-arrow-down' : 'el-icon-arrow-up',
                 ]"
               />
             </div>
@@ -218,7 +452,7 @@
               :class="[
                 defaultMap.imageActive
                   ? 'el-icon-arrow-up'
-                  : 'el-icon-arrow-down'
+                  : 'el-icon-arrow-down',
               ]"
             />
           </div>
@@ -250,7 +484,7 @@
             <i
               v-if="
                 defaultMap.toolTitle === '测距' ||
-                  defaultMap.toolTitle === '测面'
+                defaultMap.toolTitle === '测面'
               "
               class="arrow el-icon-close pointer"
               @click.stop="hideMeasure"
@@ -261,14 +495,14 @@
               :class="[
                 defaultMap.toolActive
                   ? 'el-icon-arrow-up'
-                  : 'el-icon-arrow-down'
+                  : 'el-icon-arrow-down',
               ]"
             />
           </div>
           <div class="bd" :class="{ active: defaultMap.toolActive }">
             <ul>
               <li @click="showDouble">分屏</li>
-              <!-- <li>对比</li> -->
+              <li @click="showDoubleNew" v-if="!isVersion">对比</li>
               <li @click="showRoller">卷帘</li>
               <li @click="showMeasure('LineString')">测距</li>
               <li @click="showMeasure('Polygon')">测面</li>
@@ -277,7 +511,7 @@
         </div>
       </div>
     </div>
-    <div v-if="mapControl" class="map-control">
+    <div class="map-control" v-if="mapControl">
       <div
         v-if="baseSelect"
         class="item"
@@ -308,7 +542,7 @@
 
         <div id="popup-content" class="bd bd-img">
           <template v-for="(item, index) in popupData.content">
-            <img :key="index" :src="$imgUrl(item, `${imgType}`)" alt="">
+            <img :key="index" :src="$imgUrl(item, `${imgType}`)" alt="" />
           </template>
           <!-- <div
             class="item"
@@ -326,6 +560,7 @@
     <div
       :id="`popup_${id}`"
       class="popup"
+      :class="`${popupData.class}`"
       :style="{ transform: ` scale(${scaleValue})` }"
     >
       <div v-loading="popupLoading" class="body">
@@ -341,7 +576,7 @@
             :style="{ width: v.width }"
           >
             <span>{{ v.key }}</span>
-            <span class="value" :title="v.value">{{ v.value || '-' }}</span>
+            <span class="value" :title="v.value">{{ v.value || "-" }}</span>
           </div>
         </div>
         <div class="ft">
@@ -394,77 +629,86 @@
       <span class="mr-10">来源：{{ imageLayerInfo.origin }}</span>
       <!-- <span>时相：{{imageLayerInfo.time || '未知'}}</span> -->
     </div>
+    <div v-if="mapRanging" class="map-ranging">
+      <div id="ranging" ref="ranging" style="height: 100%" />
+      <div class="close" @click="rangingClose"><i class="el-icon-close" /></div>
+    </div>
     <VideoConnection v-if="videoData.show" :video-data="videoData" />
   </div>
 </template>
 <script>
-import 'ol/ol.css';
-import { get as getProjection } from 'ol/proj';
+import "ol/ol.css";
+import { get as getProjection } from "ol/proj";
 import {
-  // getWidth, getTopLeft, boundingExtent,
+  getWidth, getTopLeft, boundingExtent,
   extend,
-  getCenter
-} from 'ol/extent';
-import View from 'ol/View';
-import Map from 'ol/Map';
-import { defaults as defaultInteractions } from 'ol/interaction';
-import { unByKey } from 'ol/Observable';
-import { getArea, getLength } from 'ol/sphere.js';
-import TileLayer from 'ol/layer/Tile';
-import TileWMS from 'ol/source/TileWMS';
-import VectorSource from 'ol/source/Vector';
-import ClusterSource from 'ol/source/Cluster'; // 聚合
-import WMTSTileGrid from 'ol/tilegrid/WMTS';
-import TileGrid from 'ol/tilegrid/TileGrid';
-import VectorLayer from 'ol/layer/Vector';
-import Feature from 'ol/Feature';
-import Overlay from 'ol/Overlay';
+  getCenter,
+} from "ol/extent";
+import View from "ol/View";
+import Map from "ol/Map";
+import { defaults as defaultInteractions } from "ol/interaction";
+import { unByKey } from "ol/Observable";
+import { getArea, getLength } from "ol/sphere.js";
+import TileLayer from "ol/layer/Tile";
+import TileWMS from "ol/source/TileWMS";
+import VectorSource from "ol/source/Vector";
+import ClusterSource from "ol/source/Cluster"; // 聚合
+import Heatmap from "ol/layer/Heatmap";
+import WMTS from "ol/source/WMTS";
+import WMTSTileGrid from "ol/tilegrid/WMTS";
+import TileGrid from "ol/tilegrid/TileGrid";
+import VectorLayer from "ol/layer/Vector";
+import Feature from "ol/Feature";
+import Overlay from "ol/Overlay";
 // import geom from 'ol/geom.js'
-import MultiPoint from 'ol/geom/MultiPoint';
-import Point from 'ol/geom/Point';
-import Polygon from 'ol/geom/Polygon';
-import MultiPolygon from 'ol/geom/MultiPolygon';
-import LineString from 'ol/geom/LineString';
-import MultiLineString from 'ol/geom/MultiLineString';
+import Circle from "ol/geom/Circle";
+import MultiPoint from "ol/geom/MultiPoint";
+import Point from "ol/geom/Point";
+import Polygon from "ol/geom/Polygon";
+import MultiPolygon from "ol/geom/MultiPolygon";
+import LineString from "ol/geom/LineString";
+import MultiLineString from "ol/geom/MultiLineString";
 
-import olStyle from 'ol/style/Style';
-import olStyleIcon from 'ol/style/Icon';
-import olStyleText from 'ol/style/Text';
-import olStyleCircle from 'ol/style/Circle';
-import olStyleFill from 'ol/style/Fill';
-import olStyleStroke from 'ol/style/Stroke';
-import XYZ from 'ol/source/XYZ';
-import WKT from 'ol/format/WKT';
-import lodash from 'lodash';
+import olStyle from "ol/style/Style";
+import olStyleIcon from "ol/style/Icon";
+import olStyleText from "ol/style/Text";
+import olStyleCircle from "ol/style/Circle";
+import olStyleFill from "ol/style/Fill";
+import olStyleStroke from "ol/style/Stroke";
+import XYZ from "ol/source/XYZ";
+import WKT from "ol/format/WKT";
+import lodash from "lodash";
 // import { defaults as defaultControls } from 'ol/control';
 // import FullScreen from 'ol/control/FullScreen';
 // import MousePosition from 'ol/control/MousePosition';
-import Draw from 'ol/interaction/Draw';
-import Snap from 'ol/interaction/Snap';
-import Modify from 'ol/interaction/Modify';
-import Select from 'ol/interaction/Select';
-import { click } from 'ol/events/condition';
+import Draw from "ol/interaction/Draw";
+import Snap from "ol/interaction/Snap";
+import Modify from "ol/interaction/Modify";
+import Select from "ol/interaction/Select";
+import { click } from "ol/events/condition";
 
-import ScaleLine from 'ol/control/ScaleLine';
+import ScaleLine from "ol/control/ScaleLine";
 
-import * as olCoordinate from 'ol/coordinate';
-import ImageLayer from 'ol/layer/Image';
-import RasterSource from 'ol/source/Raster';
-import GeoJSON from 'ol/format/GeoJSON';
+import * as olCoordinate from "ol/coordinate";
+import ImageLayer from "ol/layer/Image";
+import RasterSource from "ol/source/Raster";
+import GeoJSON from "ol/format/GeoJSON";
 
-import { fromExtent } from 'ol/geom/Polygon';
-import { bbox as bboxStrategy } from 'ol/loadingstrategy';
+import { fromExtent } from "ol/geom/Polygon";
+import { bbox as bboxStrategy } from "ol/loadingstrategy";
 /* eslint-disable */
 
-import formatWKT from 'terraformer-wkt-parser';
-import areaData from './area-data';
-import VideoConnection from '@/components/VideoConnection';
-import { getRenderPixel } from 'ol/render';
-import { deepClone, parseTime } from '@/utils';
-import patrol from '@/api/patrol';
-import { isArray } from '@/utils/validate';
-import { LinearRing } from 'ol/geom'; //引入几何类
-const jsts = require('jsts/dist/jsts.min.js'); //引入jsts
+import formatWKT from "terraformer-wkt-parser";
+// import areaData from "./area-data";
+import VideoConnection from "@/components/VideoConnection";
+import { getRenderPixel } from "ol/render";
+import { deepClone, parseTime } from "@/utils";
+import patrol from "@/api/patrol";
+import { searchAreaList } from "@/api/tianditu";
+import { isArray } from "@/utils/validate";
+import { LinearRing } from "ol/geom"; //引入几何类
+import AreaSelect from "@/components/AreaSelect";
+const jsts = require("jsts/dist/jsts.min.js"); //引入jsts
 
 const OL3Parser = new jsts.io.OL3Parser();
 OL3Parser.inject(
@@ -478,87 +722,150 @@ OL3Parser.inject(
 );
 
 export default {
-  name: 'MapLayer',
+  name: "MapLayer",
   props: {
+    mapAnimation: {
+      type: Boolean,
+      default: false,
+    },
+    searchForm: {
+      type: Boolean | Object,
+      default: null,
+    },
     copyMap: {
       type: Object,
-      default: null
+      default: null,
     },
     //地图divID由父组件传，解决一个页面两个地图视图问题
     id: {
       type: String,
-      default: 'mapId' + new Date().getTime() + Math.random()
+      default: "mapId" + new Date().getTime() + Math.random(),
     },
     height: {
       type: String,
-      default: '500px'
+      default: "500px",
     },
     // 影像选择
     imageSelect: {
       type: Boolean,
-      default: true
+      default: true,
     },
 
     // 加载影像数据
     imageFetch: {
       type: Boolean,
-      default: true
+      default: true,
     },
 
     // 自定义颜色
     isCustom: {
       type: Boolean,
-      default: false
+      default: false,
     },
 
     // 缩放值
     scaleValue: {
       type: Number,
-      default: 1
+      default: 1,
     },
 
     // 区域边界，区域外遮罩
     areaWkt: {
       type: String,
-      default: ''
+      default: "",
     },
     // 显示底图，默认显示
     showBaseLayer: {
       type: Boolean,
-      default: true
+      default: true,
     },
     // 显示注记图层，默认显示
     showNoteLayer: {
       type: Boolean,
-      default: true
+      default: true,
     },
     trackPlayBack: {
       type: Object,
-      default: () => {}
+      default: () => {},
     },
     year: {
       type: Number,
-      default: null
+      default: null,
     },
     mapInfo: {
       type: Boolean,
-      default: true
+      default: true,
     },
     mapControl: {
       type: Boolean,
-      default: true
+      default: true,
     },
     baseSelect: {
       type: Boolean,
-      default: false
+      default: false,
     },
     baseLayer: {
       type: Number,
-      default: 1
-    }
+      default: 1,
+    },
+    // 这是卷帘用的默认值年份，定位功能小班搜索也用到了
+    rollerYear: {
+      type: String,
+      default: "",
+    },
+    //这是控制卷帘是否可以切换年份
+    isShowRollerYear: {
+      type: Boolean,
+      default: false,
+    },
+    //这是卷帘用于年份切换的
+    yearChangeFunction: {
+      type: Function,
+      default() {
+        return any;
+      },
+    },
+    //控制工具栏哪些隐藏显示
+    showRadioItem: {
+      type: Array,
+      required: false,
+      default() {
+        return [];
+      },
+    },
+    //控制工具栏
+    isShowTool: {
+      type: Boolean,
+      default: false,
+    },
+    //控制竖向的工具栏
+    isTerrainVertical: {
+      type: Boolean,
+      default: false,
+    },
+    //控制竖向工具栏展示那些
+    showTerrainItem: {
+      type: Array,
+      required: false,
+      default() {
+        return ["terrain", "tool"];
+      },
+    },
+    // 年版对比
+    isVersion: {
+      type: Boolean,
+      default: false,
+    },
+    versionSelectData: {
+      type: Array,
+      default() {
+        return [];
+      },
+    },
   },
   components: {
-    VideoConnection
+    VideoConnection,
+    AreaSelect,
   },
   data() {
     const defaultMap = {
@@ -570,161 +877,172 @@ export default {
       extent: [113.3436, 24.2914, 118.2858, 30.0441],
       interactions: defaultInteractions({
         pinchRotate: false, // 移动端禁止地图旋转
-        doubleClickZoom: false //禁止双击放大地图
+        doubleClickZoom: false, //禁止双击放大地图
       }),
-      tk: 'f536641212889df16a6afaa1beff020b',
-      layerEventType: 'singleclick',
+      tk: "f536641212889df16a6afaa1beff020b",
+      layerEventType: "singleclick",
 
-      geoServerUrl: this.$mapUrl,
-      geoServerWork: 'LYGL_SLDC_Work', //工作区
-      // geoServerData: 'LYGL_JiAn_Data',//数据存储
+      geoServerUrl: this.CommonConst.mapDefault.GeoserverAddress,
+      geoServerWork: this.CommonConst.mapDefault.GeoserverWork, //工作区
+      geoServerData: this.CommonConst.mapDefault.GeoserverData, //数据存储
 
       baseLayers: [
         {
-          url: 'http://t4.tianditu.gov.cn/DataServer?T=vec_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b', //平面
-          noteUrl:
-            'http://t4.tianditu.gov.cn/DataServer?T=cva_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b',
-          name: 'base_layer_tdt_vec_c', // 名称
-          noteName: 'base_layer_tdt_cva_c',
-          title: '天地图', // 标题
+          url: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=vec_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`, //平面
+          noteUrl: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=cva_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`,
+          name: "base_layer_tdt_vec_c", // 名称
+          noteName: "base_layer_tdt_cva_c",
+          title: "天地图", // 标题
           index: 0, //
-          origin: '天地图', // 来源
+          origin: "天地图", // 来源
           type: 1, // 影像类型
           active: false, // 是否显示
-          time: '未知', // 更新时间
-          no: 'GS(2021)1487号' // 版本号
+          time: "未知", // 更新时间
+          no: "GS(2021)1487号", // 版本号
         },
         {
-          url: 'http://t4.tianditu.gov.cn/DataServer?T=img_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b', // 影像
-          noteUrl:
-            'http://t4.tianditu.gov.cn/DataServer?T=cia_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b',
-          name: 'base_layer_tdt_img_c', // 名称
-          noteName: 'base_layer_tdt_cia_c',
-          title: '天地图', // 标题
+          url: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=img_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`, // 影像
+          noteUrl: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=cia_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`,
+          name: "base_layer_tdt_img_c", // 名称
+          noteName: "base_layer_tdt_cia_c",
+          title: "天地图", // 标题
           index: 0, //
-          origin: '天地图', // 来源
+          origin: "天地图", // 来源
           type: 1, // 影像类型
           active: false, // 是否显示
-          time: '未知', // 更新时间
-          no: 'GS(2021)1487号' // 版本号
+          time: "未知", // 更新时间
+          no: "GS(2021)1487号", // 版本号
         },
         {
-          url: 'http://t4.tianditu.gov.cn/DataServer?T=ter_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b', //地形
-          noteUrl:
-            'http://t4.tianditu.gov.cn/DataServer?T=cta_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b',
-          name: 'base_layer_tdt_ter_c', // 名称
-          noteName: 'base_layer_tdt_cta_c',
-          title: '天地图', // 标题
+          url: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=ter_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`, //地形
+          noteUrl: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=cta_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`,
+          name: "base_layer_tdt_ter_c", // 名称
+          noteName: "base_layer_tdt_cta_c",
+          title: "天地图", // 标题
           index: 0, //
-          origin: '天地图', // 来源
+          origin: "天地图", // 来源
           type: 1, // 影像类型
           active: false, // 是否显示
-          time: '未知', // 更新时间
-          no: 'GS(2021)1487号' // 版本号
-        }
+          time: "未知", // 更新时间
+          no: "GS(2021)1487号", // 版本号
+        },
       ],
-      toolTitle: '工具',
+      toolTitle: "工具",
       toolActive: false,
-      imageTitle: '天地图',
+      imageTitle: "天地图",
       imageActive: false,
       imageLayers: [
         {
-          url: 'http://t5.tianditu.gov.cn/DataServer?T=img_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b',
-          name: 'base_layer_tdt',
-          title: '天地图',
+          url: `http://t${
+            (Math.random() * 8) | 0
+          }.tianditu.gov.cn/DataServer?T=img_c&x={1}&y={2}&l={0}&tk=f536641212889df16a6afaa1beff020b`,
+          name: "base_layer_tdt",
+          title: "天地图",
           index: 0,
-          origin: '天地图',
+          origin: "天地图",
           type: 1,
           active: true,
-          time: '未知',
-          no: 'GS(2021)1487号'
+          time: "未知",
+          no: "GS(2021)1487号",
         },
         {
           index: 0,
-          url: 'https://jx.zhlzz.com:8036/slzy_yx/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          url: "https://jx.zhlzz.com:8036/slzy_yx/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           // url: "http://124.193.194.41/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          name: 'image_layer_0',
-          title: '即时影像',
+          name: "image_layer_0",
+          title: "即时影像",
           type: 0,
           active: false,
-          origin: '国家林草局',
+          origin: "国家林草局",
           time: null,
-          no: 'GS(2020)3758号',
-          year: '2022'
+          no: "GS(2020)3758号",
+          year: "2022",
         },
         {
           index: 0,
-          url: 'https://jx.zhlzz.com:8036/slzy_2021/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          url: "https://jx.zhlzz.com:8036/slzy_2021/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           // url: "http://124.193.194.42:8080/onemap21/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          name: 'image_layer_1',
-          title: '2021版影像',
+          name: "image_layer_1",
+          title: "2021版影像",
           type: 0,
           active: false,
-          origin: '国家林草局',
+          origin: "国家林草局",
           time: null,
-          no: 'GS(2020)3758号',
-          year: '2021'
+          no: "GS(2020)3758号",
+          year: "2021",
         },
         {
           index: 0,
-          url: 'https://jx.zhlzz.com:8036/slzy_2020/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          url: "https://jx.zhlzz.com:8036/slzy_2020/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           // url: "http://124.193.194.42:8080/onemap20/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          name: 'image_layer_2',
-          title: '2020版影像',
+          name: "image_layer_2",
+          title: "2020版影像",
           type: 0,
           active: false,
-          origin: '国家林草局',
+          origin: "国家林草局",
           time: null,
-          no: 'GS(2020)3758号',
-          year: '2020'
+          no: "GS(2020)3758号",
+          year: "2020",
         },
         {
           index: 0,
-          url: 'https://jx.zhlzz.com:8036/slzy_2019/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          url: "https://jx.zhlzz.com:8036/slzy_2019/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           // url: "http://124.193.194.42:8080/onemap19/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          name: 'image_layer_3',
-          title: '2019版影像',
+          name: "image_layer_3",
+          title: "2019版影像",
           type: 0,
           active: false,
-          origin: '国家林草局',
+          origin: "国家林草局",
           time: null,
-          no: 'GS(2020)3758号',
-          year: '2019'
+          no: "GS(2020)3758号",
+          year: "2019",
         },
         {
           index: 0,
-          url: 'https://jx.zhlzz.com:8036/slzy_2018/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          url: "https://jx.zhlzz.com:8036/slzy_2018/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           // url: "http://124.193.194.42:8080/onemap18/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          name: 'image_layer_4',
-          title: '2018版影像',
+          name: "image_layer_4",
+          title: "2018版影像",
           type: 0,
           active: false,
-          origin: '国家林草局',
-          time: '2022-05',
-          no: 'GS(2020)3758号',
-          year: '2018'
+          origin: "国家林草局",
+          time: "2022-05",
+          no: "GS(2020)3758号",
+          year: "2018",
         },
         {
           index: 0,
-          url: 'https://jx.zhlzz.com:8036/slzy_2017/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}',
+          url: "https://jx.zhlzz.com:8036/slzy_2017/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           // url: "http://124.193.194.42:8080/onemap17/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          name: 'image_layer_5',
-          title: '2017版影像',
+          name: "image_layer_5",
+          title: "2017版影像",
           type: 0,
           active: false,
-          origin: '国家林草局',
+          origin: "国家林草局",
           time: null,
-          no: 'GS(2020)3758号',
-          year: '2017'
-        }
+          no: "GS(2020)3758号",
+          year: "2017",
+        },
       ],
 
       defaultStyle: {
         fill: {
-          color: 'rgba(255, 255, 255, 0)'
+          color: "rgba(255, 255, 255, 0)",
         },
         text: {
-          font: '14px 微软雅黑', //默认是'10px sans-serif'
+          font: "14px 微软雅黑", //默认是'10px sans-serif'
           //text:'',//文本内容
           //textAlign：'center',//文本对齐 'left', 'right', 'center', 'end' 'start'.针对于placement: 'point',默认为'center'；针对于placement: 'line'，默认是让渲染器选择不超过maxAngle的位置
           //textBaseline:'middle',//文本基线  'bottom', 'top', 'middle', 'alphabetic', 'hanging', 'ideographic' 默认'middle'
@@ -732,12 +1050,12 @@ export default {
           //scale：,
           padding: [0, 0, 0, 0], //文本周围的像素填充。数组中值的顺序是[top, right, bottom, left]
           fill: {
-            color: '#FFFFFF'
+            color: "#FFFFFF",
           }, //如果未设置，默认未#333
           stroke: {
-            color: '#FFFFFF',
-            width: 1
-          }
+            color: "#FFFFFF",
+            width: 1,
+          },
           // offsetX:0,//水平文本偏移量(以像素为单位)。正值将把文本右移。默认0
           // offsetY:0,//垂直文本偏移量(以像素为单位)。正值会将文本向下移动。默认0
           // rotation：0,//默认0
@@ -747,13 +1065,13 @@ export default {
         },
         stroke: {
           width: 2, //宽
-          color: '#00C5D4' //颜色、渐变或图案
+          color: "#00C5D4", //颜色、渐变或图案
           // lineCap:'round',//线帽风格  butt, round, 或者 square 默认 round
           // lineJoin:'round',//线连接方式 bevel, round, 或者 miter 默认 round
           // lineDash： [],//线间隔模式 这个变化与分辨率有关 默认为undefined Internet Explorer 10和更低版本不支持
           // lineDashOffset:0,//线段间隔偏移 默认0
           // miterLimit:10,// 默认10
-        }
+        },
         // image: {
         //   //anchor:[0.5,0.5]，//锚。默认值是图标中心 默认值是[0.5,0.5]
         //   // anchorOrigin:'top-left',//锚的原点:左下角、右下角、左上方或右上方。默认是左上
@@ -787,15 +1105,21 @@ export default {
         click: {},
         dblclick: {},
         pointermove: {},
-        singleclick: {}
+        singleclick: {},
+        vectorEventFun: {},
       },
       isOpenDFM: true, //是否显示度分秒
-      fractionDigits: 2 //保留位数,
+      fractionDigits: 2, //保留位数,
     };
     const map = null;
     const view = null;
     const popupLayer = null;
     return {
+      searchType: 1,
+      backAreaList: [],
+      mapSearchQuery: {
+        // areaCode: this.$store.getters.areaCode,
+      },
       imgType: null,
       videoData: {},
       map,
@@ -806,6 +1130,7 @@ export default {
       baseLayerObj: {}, //加载图层图层信息存放，图层名称：图层信息
       drawLayerObj: {}, //前端绘制图层信息存放obj
       wmsLayerObj: {}, //geoserver图层存放obj
+      wmtsLayerObj: {}, //wtms图层存放obj
       trackPlayBackObj: {
         timeIndex: 0,
         nowDifTime: 0.0,
@@ -822,13 +1147,13 @@ export default {
         ispuse: 0,
         rate: 50,
         timeRate: 0,
-        imgType: 'people',
+        imgType: "people",
         imgDeg: 0,
         buffer: 100, //缓冲区距离，单位为米，默认为100
         areaBoundaryLine: null, //责任区数据，单个为字符串，多个为数组，单个数组也可
         showDeal: false, //是否展示虚拟轨迹点
         showControl: false, //是否展示轨迹回放控制器
-        drawType: 'point' //轨迹显示方式'point' 显示点位，'line'显示线
+        drawType: "point", //轨迹显示方式'point' 显示点位，'line'显示线
       }, //轨迹回放对象
       imageLayerObj: {},
       imageLayerInfo: {},
@@ -845,27 +1170,97 @@ export default {
       },
       toolData: {},
       mapDouble: false,
+      mapDoubleNew: false,  // 分屏对比
+      doubleTitleIndex1: 0,  // 分屏对比标题
+      doubleTitleIndex2: 0, // 分屏对比标题
       doubleView: null,
       doubleMap1: null,
       doubleMap2: null,
-      doubleTitle1: '',
-      doubleTitle2: '',
+      doubleTitle1: "",
+      doubleTitle2: "",
       doubleActive1: false,
       doubleActive2: false,
       doubleIndex1: 0,
       doubleIndex2: 0,
       mapRoller: false,
+      mapRollerNew: false,
+      rollerBardata1: "base_layer_tdt",
+      rollerBardata2: "base_layer_tdt",
+      rollerIndexNew1: 0,
+      rollerIndexNew2: 0,
+      options: [],
+      yearValue1: "",
+      yearValue2: "",
+      rollerMap1: null,
+      rollerMap2: null,
+      roller2Width: 0,
+      roller2Height: 0,
+      rangingMap: null, // 这是工具绘制的新的一个Map对象就是新创建了一个地图，然后盖展示图层的地图上方
+      drawLayerObj1: {}, // 工具绘制图层信息存放obj，相当于和mapTypeList一样也是存放图层的
+      mapRanging: false, // 这就是控制工具所绘制的地图显示开关
+
       rollerMap: null,
       rollerValue: 50,
-      rollerTitle1: '',
-      rollerTitle2: '',
+      rollerTitle1: "",
+      rollerTitle2: "",
       rollerActive1: false,
       rollerActive2: false,
       rollerIndex1: 0,
       rollerIndex2: 0,
       rollerImages1: [],
       rollerImages2: [],
-      tips: null
+      tips: null,
+      defaultWmts: {
+        gridsetName: "EPSG:4326",
+        gridNames: [
+          "EPSG:4326:0",
+          "EPSG:4326:1",
+          "EPSG:4326:2",
+          "EPSG:4326:3",
+          "EPSG:4326:4",
+          "EPSG:4326:5",
+          "EPSG:4326:6",
+          "EPSG:4326:7",
+          "EPSG:4326:8",
+          "EPSG:4326:9",
+          "EPSG:4326:10",
+          "EPSG:4326:11",
+          "EPSG:4326:12",
+          "EPSG:4326:13",
+          "EPSG:4326:14",
+          "EPSG:4326:15",
+          "EPSG:4326:16",
+          "EPSG:4326:17",
+          "EPSG:4326:18",
+          "EPSG:4326:19",
+          "EPSG:4326:20",
+          "EPSG:4326:21",
+        ],
+        style: "",
+        format: "image/png",
+        // infoFormat: "text/html",
+        infoFormat: "application/json",
+        layerName: "testGroup",
+        projection: "EPSG:4326",
+        resolutions: [
+          0.703125, 0.3515625, 0.17578125, 0.087890625, 0.0439453125,
+          0.02197265625, 0.010986328125, 0.0054931640625, 0.00274658203125,
+          0.001373291015625, 6.866455078125e-4, 3.4332275390625e-4,
+          1.71661376953125e-4, 8.58306884765625e-5, 4.291534423828125e-5,
+          2.1457672119140625e-5, 1.0728836059570312e-5, 5.364418029785156e-6,
+          2.682209014892578e-6, 1.341104507446289e-6, 6.705522537231445e-7,
+          3.3527612686157227e-7,
+        ],
+        baseParams: [
+          "VERSION",
+          "LAYER",
+          "STYLE",
+          "TILEMATRIX",
+          "TILEMATRIXSET",
+          "SERVICE",
+          "FORMAT",
+        ],
+      },
     };
   },
   created() {
@@ -876,6 +1271,8 @@ export default {
   mounted() {
     this.$nextTick(() => {
       this.initMap();
+      this.roller2Width = this.$refs.rootmap.offsetWidth;
+      this.roller2Height = this.$refs.rootmap.offsetHeight;
     });
   },
   beforeDestroy() {
@@ -883,24 +1280,95 @@ export default {
   },
   watch: {},
   methods: {
+    getAreaList(areaName) {
+      if (areaName) {
+        const param = {
+          areaName,
+        };
+        searchAreaList(param).then((res) => {
+          this.backAreaList = res.data;
+        });
+      } else {
+        this.backAreaList = [];
+      }
+    },
+    // 行政区划
+    async areaChange(val) {
+      const temp = deepClone(val);
+      if (isArray(temp) && temp.length) {
+        this.mapSearchQuery.areaCode = temp.pop();
+      } else {
+        this.mapSearchQuery.areaCode = "";
+      }
+      this.searchForm.changePage = this.getAreaPerson;
+      this.getAreaPerson();
+    },
+    getAreaDetail(obj) {
+      this.$emit("getAreaDetail", obj);
+    },
+    async getAreaPerson() {
+      let param = {};
+      param.pageNo = this.searchForm.pageNo;
+      param.pageSize = this.searchForm.pageSize;
+      param.areaCode = this.mapSearchQuery.areaCode;
+      param.type = 1;
+      this.searchForm.loading = true;
+      let res = await this.searchForm.areaFun(param);
+      this.searchForm.loading = false;
+      this.searchForm.total = res.total;
+      this.$emit("fitByArea", res.data, res.total);
+    },
+    async fitByPoint() {
+      let param = {};
+      param.lon = this.mapSearchQuery.lon.includes("°")
+        ? this.changeToDu(this.mapSearchQuery.lon)
+        : this.mapSearchQuery.lon;
+      param.lat = this.mapSearchQuery.lat.includes("°")
+        ? this.changeToDu(this.mapSearchQuery.lat)
+        : this.mapSearchQuery.lat;
+      let res = await this.searchForm.pointFun(param);
+      this.$emit("fitByPoint", res.data, param);
+    },
+    changeToDFM(du) {
+      var str1 = du.split(".");
+      var du1 = str1[0];
+      var tp = "0." + str1[1];
+      var tp = String(tp * 60); //这里进行了强制类型转换
+      var str2 = tp.split(".");
+      var fen = str2[0];
+      tp = "0." + str2[1];
+      tp = tp * 60;
+      var miao = tp;
+      return du1 + "°" + fen + "'" + miao + '"';
+    },
+    changeToDu(dfm) {
+      const arr1 = dfm.split("°");
+      const d = arr1[0];
+      const arr2 = arr1[1].split("'");
+      let f = arr2[0] || 0;
+      const m = arr2[1].replace('"', "") || 0;
+      f = parseFloat(f) + parseFloat(m / 60);
+      var du = parseFloat(f / 60) + parseFloat(d);
+      return du;
+    },
     multiPointToLine(arr) {
       var geojsonTemp = {
-        type: 'LineString',
-        coordinates: arr
+        type: "LineString",
+        coordinates: arr,
       };
       // 空间数据转换
       const flyData = formatWKT.convert(geojsonTemp);
       const polygonArr = [];
       polygonArr.push({
         coords: flyData,
-        id: new Date().getDate
+        id: new Date().getDate,
       });
       return polygonArr;
     },
     //根据wkt返回长度或面积单位米
     getAreaByWkt: function (
       wkt,
-      obj = { radius: 6378137, projection: 'EPSG:4326' }
+      obj = { radius: 6378137, projection: "EPSG:4326" }
     ) {
       var geom = new WKT().readGeometry(wkt);
       var output = 0;
@@ -925,9 +1393,9 @@ export default {
     getDrawVector: function () {
       if (!this.trackPlayBackObj.drawVector) {
         this.trackPlayBackObj.drawVector = new VectorLayer({
-          name: 'trackLayer',
+          name: "trackLayer",
           source: new VectorSource(),
-          zIndex: 1000
+          zIndex: 1000,
         });
         this.map.getLayers().insertAt(1, this.trackPlayBackObj.drawVector);
       }
@@ -947,7 +1415,7 @@ export default {
             break;
           }
         }
-      } else if (boundaryLine) {
+      } else if (!isArray(boundaryLine)) {
         inArea = this.judgeIsIntersectsCoordinate(
           this.getBufferWkt(boundaryLine, this.trackPlayBackObj.buffer),
           point
@@ -968,27 +1436,27 @@ export default {
             image: new olStyleIcon({
               anchor: [0.5, 1],
               scale: 0.8,
-              src: require('./image/pointhighlights-green.png')
-            })
+              src: require("./image/pointhighlights-green.png"),
+            }),
           })
         : new olStyle({
             image: new olStyleIcon({
               anchor: [0.5, 1],
               scale: 0.8,
-              src: require('./image/pointhighlights-red.png')
-            })
+              src: require("./image/pointhighlights-red.png"),
+            }),
           });
       return style;
     },
     checkLineStyle() {
       let style = new olStyle({
         fill: new olStyleFill({
-          color: 'rgba(255, 0, 0, 0.5)'
+          color: "rgba(255, 0, 0, 0.5)",
         }),
         stroke: new olStyleStroke({
-          color: 'red',
-          width: 3
-        })
+          color: "red",
+          width: 3,
+        }),
       });
       return style;
     },
@@ -999,7 +1467,7 @@ export default {
       if (point1 && point2) {
         var line = new LineString([point1, point2]);
         var feature = new Feature({
-          geometry: line
+          geometry: line,
         });
         feature.setStyle(style);
         drawVector.getSource().addFeature(feature);
@@ -1016,7 +1484,7 @@ export default {
       var point = new Point(point);
       let style = this.checkPointStyle(point);
       var feature = new Feature({
-        geometry: point
+        geometry: point,
       });
       feature.setStyle(style);
       drawVector.getSource().addFeature(feature);
@@ -1057,9 +1525,9 @@ export default {
       var frameState = event.frameState;
       this.loadTrackPosition(newPoints[index]);
       this.loadTimeAndLength(index);
-      if (this.trackPlayBackObj.drawType === 'point') {
+      if (this.trackPlayBackObj.drawType === "point") {
         this.addPoint(newPoints[index]);
-      } else if (this.trackPlayBackObj.drawType === 'line') {
+      } else if (this.trackPlayBackObj.drawType === "line") {
         if (index == 1) {
           this.addLine(newPoints[0], newPoints[1]);
         } else if (index > 1) {
@@ -1072,9 +1540,9 @@ export default {
           newPoints[index]
         );
         let imgType = this.trackPlayBackObj.imgType;
-        if (imgType == 'people') {
+        if (imgType == "people") {
           this.changeDirection(newPoints[index - 1], newPoints[index]);
-        } else if (imgType == 'uav') {
+        } else if (imgType == "uav") {
           this.trackPlayBackObj.imgDeg = -rotation;
         }
       }
@@ -1099,9 +1567,17 @@ export default {
       this.stopAnimation();
       this.trackPlayBackObj.index = index;
       this.trackPlayBackObj.timeIndex = index; //动画已跳过下标数
-      points.forEach((item) => {
+      points.forEach((item, index) => {
         //绘制进度条覆盖的点位
-        this.addPoint(item);
+        if (this.trackPlayBackObj.drawType == "point") {
+          this.addPoint(item);
+        } else {
+          if (index == 1) {
+            this.addLine(points[0], points[1]);
+          } else if (index > 1) {
+            this.addLine(points[index]);
+          }
+        }
       });
       this.startAnimation();
       // console.log(drawVector.getSource().getFeatures());
@@ -1118,21 +1594,21 @@ export default {
         const imgObj = {
           people: {
             widthOffeset: 64 / 2,
-            heightOffeset: 68
+            heightOffeset: 68,
           },
           uav: {
             widthOffeset: 32 / 2,
-            heightOffeset: 32 / 2
-          }
+            heightOffeset: 32 / 2,
+          },
         };
         var widthOffeset = imgObj[imgType].widthOffeset;
         var heightOffeset = imgObj[imgType].heightOffeset;
         this.trackPlayBackObj.overlay = new Overlay({
           position: [0, 0],
-          positioning: 'center-bottom',
+          positioning: "center-bottom",
           element: this.$refs[`map-${imgType}`],
           //stopEvent: false,
-          offset: [-widthOffeset, -heightOffeset]
+          offset: [-widthOffeset, -heightOffeset],
         });
         this.map.addOverlay(this.trackPlayBackObj.overlay);
       }
@@ -1145,21 +1621,23 @@ export default {
       this.trackPlayBackObj.tempDate = 0;
       this.trackPlayBackObj.timeRate = this.trackPlayBackObj.difTime;
       this.loadTimeAndLength();
-      this.map.un('postcompose', this.moveFeature);
+      this.map.un("postcompose", this.moveFeature);
       clearInterval(this.trackPlayBackObj.inter);
       this.trackPlayBackObj.inter = null;
     },
     checkTimeMarks() {
-      let marks = {};
-      let timeList = this.trackPlayBackObj.difTimeList;
-      timeList.forEach((item, index) => {
-        // console.log(index);
-        marks[item] = {
-          index
-        };
-      });
-      this.trackPlayBackObj.marks = marks;
-      return marks;
+      if (this.trackPlayBackObj.difTimeList) {
+        let marks = {};
+        let timeList = this.trackPlayBackObj.difTimeList;
+        timeList.forEach((item, index) => {
+          // console.log(index);
+          marks[item] = {
+            index,
+          };
+        });
+        this.trackPlayBackObj.marks = marks;
+        return marks;
+      }
     },
     DealPoints: function (points) {
       var newPoints = [];
@@ -1244,13 +1722,16 @@ export default {
     changeSpeed: function () {
       this.trackPlayBackObj.speed = (100 - this.trackPlayBackObj.rate) * 10;
     },
-    refreshAnimation: function () {
+    clearAnimation() {
       this.trackPlayBackObj.speed = (100 - this.trackPlayBackObj.rate) * 10;
       this.trackPlayBackObj.timeIndex = 0; //重置时间轴下标
       this.stopAnimation();
       if (this.trackPlayBackObj.drawVector) {
         this.trackPlayBackObj.drawVector.getSource().clear();
       }
+    },
+    refreshAnimation: function () {
+      this.clearAnimation();
       this.startAnimation();
     },
     startAnimation: function () {
@@ -1273,9 +1754,9 @@ export default {
       var extent = lines.getExtent();
       this.fitByExtent(extent, true, {
         padding: this.trackPlayBackObj.padding || [100, 100, 100, 100],
-        fit: true
+        fit: true,
       });
-      this.map.on('postcompose', this.moveFeature);
+      this.map.on("postcompose", this.moveFeature);
       this.map.render();
       this.trackPlayBackObj.inter = setInterval(() => {
         this.map.render();
@@ -1355,10 +1836,11 @@ export default {
     //加载轨迹回放数据
     async loadTrackPlayBackData(obj, trackData) {
       let id = obj.id;
+      this.clearAnimation();
       this.trackPlayBackObj = Object.assign(this.trackPlayBackObj, obj);
       if (id) {
-        let res = await patrol.patrolForestryUserinfo('route', 'get', {
-          id
+        let res = await patrol.patrolForestryUserinfo("route", "get", {
+          id,
         });
         let data = res.data;
         if (data.patrolRecordRouteLine.length) {
@@ -1402,11 +1884,12 @@ export default {
     initMap: function () {
       //debugger;
       this.view = new View({
-        projection: getProjection('EPSG:4326'), //坐标系EPSG:4326
+        projection: getProjection("EPSG:4326"), //坐标系EPSG:4326
         center: this.defaultMap.center, //中心点坐标
         minZoom: this.defaultMap.minZoom, //最小级别
         maxZoom: this.defaultMap.maxZoom,
-        zoom: this.defaultMap.zoom
+        zoom: this.defaultMap.zoom,
+        constrainResolution: true, // 限制zoom缩放为整数
         // extent: this.defaultMap.extent, //范围限制
       });
       let view = null;
@@ -1420,8 +1903,8 @@ export default {
         controls: [],
         interactions: defaultInteractions({
           pinchRotate: false, // 移动端禁止地图旋转
-          doubleClickZoom: false //禁止双击放大地图
-        })
+          doubleClickZoom: false, //禁止双击放大地图
+        }),
       });
       if (this.showBaseLayer) {
         this.addBaseLayer();
@@ -1429,7 +1912,99 @@ export default {
         this.addScaleLint();
       }
     },
+    // 叠加wmts图层服务
+    addWmtsLayer: function (dataOption) {
+      let layerInfo = dataOption.layerInfo;
+      let layer = {};
+      let name = layerInfo.name || layerInfo.layerName;
+      let layerName = layerInfo.layerName || name;
+      // let work = layerInfo.work || this.defaultMap.geoServerWork; //config.mapConfig.geoserverWork; //工作空间
 
+      /* let filter = layerInfo.filter || this.getLayerFilter(this.query) */
+      /* console.log(filter)
+      return */
+      if (this.wmtsLayerObj[name]) {
+        this.wmtsLayerObj[name].setVisible(layerInfo.visible);
+        // if (layerInfo.filter && layerInfo.filter.length > 0) {
+        //   this.updateLayerByFilter(this.wtmsLayerObj[name], layerInfo.filter);
+        // }
+      } else {
+        let url = (layerInfo.url || this.defaultMap.geoServerUrl) + "?";
+        let defaultWmtsParams = {
+          VERSION: "1.0.0",
+          LAYER: layerName,
+          STYLE: this.defaultWmts.style,
+          TILEMATRIX: layerInfo.gridNames || this.defaultWmts.gridNames,
+          TILEMATRIXSET: layerInfo.gridsetName || this.defaultWmts.gridsetName,
+          SERVICE: "WMTS",
+          FORMAT: layerInfo.format || this.defaultWmts.format,
+        };
+        Object.keys(defaultWmtsParams).forEach((param) => {
+          if (this.defaultWmts.baseParams.indexOf(param.toUpperCase()) < 0) {
+            url = url + param + "=" + defaultWmtsParams[param] + "&";
+          }
+        });
+        url = url.slice(0, -1);
+        layer.url = `${url}`;
+        layer.baseUrl = layerInfo.url || this.defaultMap.geoServerUrl;
+        layer.layer = `${layerName}`;
+        layer.name = name;
+        layer.position = layerInfo.position;
+        layer.visible = layerInfo.visible;
+        layer.format = layerInfo.format || this.defaultWmts.format;
+        layer.infoFormat = layerInfo.infoFormat || this.defaultWmts.infoFormat;
+        layer.version = layerInfo.version || "1.1.1";
+        layer.projection = getProjection(
+          layer.projection || this.defaultWmts.projection
+        );
+        layer.style = layerInfo.style || this.defaultWmts.style;
+        layer.matrixSet = defaultWmtsParams["TILEMATRIXSET"];
+        layer.matrixIds = defaultWmtsParams["TILEMATRIX"];
+        layer.resolutions =
+          layerInfo.resolutions || this.defaultWmts.resolutions;
+        let layerObj = this.initWmtsLayer(layer);
+        layerObj.layerOption = layer;
+        if (layerInfo.position) {
+          var layersArray = this.map.getLayers();
+          layersArray.insertAt(layerInfo.position, layerObj);
+        } else {
+          this.map.addLayer(layerObj);
+        }
+        this.wmtsLayerObj[name] = layerObj;
+
+        if (layerInfo.position) {
+          this.wmtsLayerObj[name].setZIndex(layerInfo.position);
+        }
+
+        // 更新地图缩放
+        if (layerInfo.fit) {
+          this.map.getView().fit(this.defaultMap.extent, this.map.getSize());
+        }
+        if (typeof dataOption.layerEventFun == "function") {
+          this.bindEventForWmsLayer(dataOption);
+        }
+      }
+    },
+    initWmtsLayer(layer) {
+      return new TileLayer({
+        source: new WMTS({
+          url: layer.url,
+          layer: layer.layer,
+          matrixSet: layer.matrixSet,
+          format: layer.format,
+          projection: layer.projection,
+          tileGrid: new WMTSTileGrid({
+            tileSize: [256, 256],
+            extent: [-180.0, -90.0, 180.0, 90.0],
+            origin: [-180.0, 90.0],
+            resolutions: layer.resolutions,
+            matrixIds: layer.matrixIds,
+          }),
+          style: layer.style,
+          wrapX: true,
+        }),
+      });
+    },
     addLayer(map, obj) {
       map = map || this.map;
       const layer = obj.layer;
@@ -1444,45 +2019,145 @@ export default {
           myMap.event.singleClick(layer, obj.singleClick);
       } */
     },
+    // 分屏对比
+    showDoubleNew(){
+      this.mapDoubleNew = true;
 
-    //显示分屏
-    showDouble() {
-      this.mapDouble = true;
-
-      this.toolData['double_1_layerObj'] = {};
-      this.toolData['double_2_layerObj'] = {};
+      this.toolData["double_1_layerObj"] = {};
+      this.toolData["double_2_layerObj"] = {};
 
       const currParam = this.defaultMap.baseLayers[this.baseLayerIndex];
       const currLayer = this.initBaseLayer(currParam);
 
-      this.toolData['double_1_layerObj'][currParam.name] = currLayer;
-      this.toolData['double_2_layerObj'][currParam.name] = currLayer;
+      this.toolData["double_1_layerObj"][currParam.name] = currLayer;
+      this.toolData["double_2_layerObj"][currParam.name] = currLayer;
 
       this.doubleView = new View({
-        projection: getProjection('EPSG:4326'), //坐标系EPSG:4326
+        projection: getProjection("EPSG:4326"), //坐标系EPSG:4326
         center: this.defaultMap.center, //中心点坐标
         minZoom: this.defaultMap.minZoom, //最小级别
         maxZoom: this.defaultMap.maxZoom,
-        zoom: this.defaultMap.zoom
+        zoom: this.defaultMap.zoom,
         // extent: this.defaultMap.extent, //范围限制
       });
 
       this.$nextTick(() => {
         this.doubleMap1 = new Map({
           layers: [
-            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex])
+            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
           ],
           view: this.doubleView,
-          target: 'double_1',
-          controls: []
+          target: "double_1",
+          controls: [],
         });
         this.doubleMap2 = new Map({
           layers: [
-            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex])
+            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
           ],
           view: this.doubleMap1.getView(),
-          target: 'double_2',
-          controls: []
+          target: "double_2",
+          controls: [],
+        });
+
+        const layer_1 = this.defaultMap.imageLayers[this.doubleIndex1];
+        const temp_1 = this.initImageLayer(layer_1);
+        const layer_2 = this.defaultMap.imageLayers[this.doubleIndex1];
+        const temp_2 = this.initImageLayer(layer_2);
+
+        this.doubleTitleIndex1 = 0;
+        this.doubleTitleIndex2 = 0;
+
+        this.toolData["double_1_layerObj"][layer_1.name] = temp_1;
+        this.toolData["double_2_layerObj"][layer_2.name] = temp_2;
+
+        this.addLayer(this.doubleMap1, { layer: temp_1, position: 1 });
+        this.addLayer(this.doubleMap2, { layer: temp_2, position: 1 });
+
+        //显示注记图层
+        if (this.showNoteLayer) {
+          const noteLayer = this.baseLayerObj[currParam.noteName];
+          this.addLayer(this.doubleMap1, { layer: noteLayer, position: 10 });
+          this.addLayer(this.doubleMap2, { layer: noteLayer, position: 10 });
+          this.toolData["double_1_layerObj"][currParam.noteName] = noteLayer;
+          this.toolData["double_2_layerObj"][currParam.noteName] = noteLayer;
+        }
+
+        for (const k in this.drawLayerObj) {
+          if (Object.hasOwnProperty.call(this.drawLayerObj, k)) {
+            const v = this.drawLayerObj[k];
+            if (v.values_.visible) {
+              this.addLayer(this.doubleMap1, {
+                layer: v,
+                position: v.values_.zIndex,
+              });
+              this.addLayer(this.doubleMap2, {
+                layer: v,
+                position: v.values_.zIndex,
+              });
+              this.toolData["double_1_layerObj"][k] = v;
+              this.toolData["double_2_layerObj"][k] = v;
+            }
+          }
+        }
+
+        for (const k in this.wmsLayerObj) {
+          if (Object.hasOwnProperty.call(this.wmsLayerObj, k)) {
+            const v = this.wmsLayerObj[k];
+            if (v.values_.visible) {
+              this.addLayer(this.doubleMap1, {
+                layer: v,
+                position: v.values_.zIndex,
+              });
+              this.addLayer(this.doubleMap2, {
+                layer: v,
+                position: v.values_.zIndex,
+              });
+              this.toolData["double_1_layerObj"][k] = v;
+              this.toolData["double_2_layerObj"][k] = v;
+            }
+          }
+        }
+      });
+    },
+
+    //显示分屏
+    showDouble() {
+      this.mapDouble = true;
+
+      this.toolData["double_1_layerObj"] = {};
+      this.toolData["double_2_layerObj"] = {};
+
+      const currParam = this.defaultMap.baseLayers[this.baseLayerIndex];
+      const currLayer = this.initBaseLayer(currParam);
+
+      this.toolData["double_1_layerObj"][currParam.name] = currLayer;
+      this.toolData["double_2_layerObj"][currParam.name] = currLayer;
+
+      this.doubleView = new View({
+        projection: getProjection("EPSG:4326"), //坐标系EPSG:4326
+        center: this.defaultMap.center, //中心点坐标
+        minZoom: this.defaultMap.minZoom, //最小级别
+        maxZoom: this.defaultMap.maxZoom,
+        zoom: this.defaultMap.zoom,
+        // extent: this.defaultMap.extent, //范围限制
+      });
+
+      this.$nextTick(() => {
+        this.doubleMap1 = new Map({
+          layers: [
+            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
+          ],
+          view: this.doubleView,
+          target: "double_1",
+          controls: [],
+        });
+        this.doubleMap2 = new Map({
+          layers: [
+            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
+          ],
+          view: this.doubleMap1.getView(),
+          target: "double_2",
+          controls: [],
         });
 
         this.doubleIndex1 = 0;
@@ -1496,8 +2171,8 @@ export default {
         this.doubleTitle1 = layer_1.title;
         this.doubleTitle2 = layer_2.title;
 
-        this.toolData['double_1_layerObj'][layer_1.name] = temp_1;
-        this.toolData['double_2_layerObj'][layer_2.name] = temp_2;
+        this.toolData["double_1_layerObj"][layer_1.name] = temp_1;
+        this.toolData["double_2_layerObj"][layer_2.name] = temp_2;
 
         this.addLayer(this.doubleMap1, { layer: temp_1, position: 1 });
         this.addLayer(this.doubleMap2, { layer: temp_2, position: 1 });
@@ -1507,8 +2182,8 @@ export default {
           const noteLayer = this.baseLayerObj[currParam.noteName];
           this.addLayer(this.doubleMap1, { layer: noteLayer, position: 10 });
           this.addLayer(this.doubleMap2, { layer: noteLayer, position: 10 });
-          this.toolData['double_1_layerObj'][currParam.noteName] = noteLayer;
-          this.toolData['double_2_layerObj'][currParam.noteName] = noteLayer;
+          this.toolData["double_1_layerObj"][currParam.noteName] = noteLayer;
+          this.toolData["double_2_layerObj"][currParam.noteName] = noteLayer;
         }
 
         for (const k in this.drawLayerObj) {
@@ -1517,14 +2192,14 @@ export default {
             if (v.values_.visible) {
               this.addLayer(this.doubleMap1, {
                 layer: v,
-                position: v.values_.zIndex
+                position: v.values_.zIndex,
               });
               this.addLayer(this.doubleMap2, {
                 layer: v,
-                position: v.values_.zIndex
+                position: v.values_.zIndex,
               });
-              this.toolData['double_1_layerObj'][k] = v;
-              this.toolData['double_2_layerObj'][k] = v;
+              this.toolData["double_1_layerObj"][k] = v;
+              this.toolData["double_2_layerObj"][k] = v;
             }
           }
         }
@@ -1535,41 +2210,62 @@ export default {
             if (v.values_.visible) {
               this.addLayer(this.doubleMap1, {
                 layer: v,
-                position: v.values_.zIndex
+                position: v.values_.zIndex,
               });
               this.addLayer(this.doubleMap2, {
                 layer: v,
-                position: v.values_.zIndex
+                position: v.values_.zIndex,
               });
-              this.toolData['double_1_layerObj'][k] = v;
-              this.toolData['double_2_layerObj'][k] = v;
+              this.toolData["double_1_layerObj"][k] = v;
+              this.toolData["double_2_layerObj"][k] = v;
             }
           }
         }
       });
     },
 
-    //关闭分屏
-    hideDouble() {
-      for (const k in this.toolData['double_1_layerObj']) {
-        if (Object.hasOwnProperty.call(this.toolData['double_1_layerObj'], k)) {
-          const v = this.toolData['double_1_layerObj'][k];
+    //关闭分屏对比
+    hideDoubleNew() {
+      for (const k in this.toolData["double_1_layerObj"]) {
+        if (Object.hasOwnProperty.call(this.toolData["double_1_layerObj"], k)) {
+          const v = this.toolData["double_1_layerObj"][k];
           this.doubleMap1.removeLayer(v);
         }
       }
-      for (const k in this.toolData['double_2_layerObj']) {
-        if (Object.hasOwnProperty.call(this.toolData['double_2_layerObj'], k)) {
-          const v = this.toolData['double_2_layerObj'][k];
+      for (const k in this.toolData["double_2_layerObj"]) {
+        if (Object.hasOwnProperty.call(this.toolData["double_2_layerObj"], k)) {
+          const v = this.toolData["double_2_layerObj"][k];
           this.doubleMap2.removeLayer(v);
         }
       }
-      this.toolData['double_1_layerObj'] = {};
-      this.toolData['double_2_layerObj'] = {};
+      this.toolData["double_1_layerObj"] = {};
+      this.toolData["double_2_layerObj"] = {};
+      this.doubleView = null;
+      this.doubleMap1 = null;
+      this.doubleMap2 = null;
+      this.mapDoubleNew = false;
+    },
+
+    //关闭分屏
+    hideDouble() {
+      for (const k in this.toolData["double_1_layerObj"]) {
+        if (Object.hasOwnProperty.call(this.toolData["double_1_layerObj"], k)) {
+          const v = this.toolData["double_1_layerObj"][k];
+          this.doubleMap1.removeLayer(v);
+        }
+      }
+      for (const k in this.toolData["double_2_layerObj"]) {
+        if (Object.hasOwnProperty.call(this.toolData["double_2_layerObj"], k)) {
+          const v = this.toolData["double_2_layerObj"][k];
+          this.doubleMap2.removeLayer(v);
+        }
+      }
+      this.toolData["double_1_layerObj"] = {};
+      this.toolData["double_2_layerObj"] = {};
       this.doubleView = null;
       this.doubleMap1 = null;
       this.doubleMap2 = null;
       this.mapDouble = false;
-      this.$emit('hideDouble');
     },
 
     // 打开分屏切换选项
@@ -1581,6 +2277,21 @@ export default {
         this.doubleActive1 = false;
         this.doubleActive2 = !this.doubleActive2;
       }
+    },
+    //分屏对比切换
+    changeDoubleLayersNew(map, tag, index) {
+      if (tag === 1) {
+        this.doubleTitleIndex1 = index;
+      } else {
+        this.doubleTitleIndex2 = index;
+      }
+
+      let obj = this.versionSelectData[index];
+      obj.active = true;
+
+      map.addCoordinateLayer(obj);
+
+
     },
 
     //分屏切换
@@ -1597,7 +2308,7 @@ export default {
       }
 
       for (let key in this.toolData[`double_${tag}_layerObj`]) {
-        if (key !== layer.name && key.indexOf('image_layer_') == 0) {
+        if (key !== layer.name && key.indexOf("image_layer_") == 0) {
           this.toolData[`double_${tag}_layerObj`][key].setVisible(false);
         }
       }
@@ -1611,12 +2322,460 @@ export default {
       }
     },
 
+    // 工具栏点击事件
+    toolbarClick(v) {
+      switch (v) {
+        case 1:
+          this.showDouble(); // 分屏
+          break;
+        case 2:
+          // this.showRoller(); // 卷帘
+          this.showRollerNew(); // 卷帘
+          break;
+        case 3:
+          this.positioningDialog = true; // 定位
+          break;
+        case 4:
+          // 测距
+          this.mapRanging = true;
+          this.$nextTick(() => {
+            this.rangingMap = new Map({
+              layers: [this.initBaseLayer(this.defaultMap.baseLayers[1])],
+              view: this.view,
+              target: "ranging",
+              controls: [],
+            });
+            const obj1 = {
+              name: "item_map1",
+              type: "LineString", // Point,LineString,Polygon,Circle
+              single: true,
+              style: {
+                fill: {
+                  color: "rgba(255, 255, 0, 0)",
+                },
+                stroke: {
+                  width: 2,
+                  color: "#ffff00",
+                },
+                // image: {
+                //   src: require('./image/icon-position-blue.png')
+                // }
+              },
+            };
+            this.drawLayerLC(obj1, function (callback) {});
+
+            for (const k in this.wmsLayerObj) {
+              this.drawLayerObj1[k] = this.wmsLayerObj[k];
+              this.rangingMap.addLayer(this.wmsLayerObj[k]);
+            }
+
+            for (const k in this.drawLayerObj) {
+              this.drawLayerObj1[k] = this.drawLayerObj[k];
+              this.rangingMap.addLayer(this.drawLayerObj[k]);
+            }
+            var scaleLineControl = new ScaleLine({
+              Units: "metric", // 单位有5种：degrees imperial us nautical metric
+            });
+
+            this.rangingMap.addControl(scaleLineControl);
+          });
+          break;
+        case 5:
+          // this.situationData = {
+          //   show: true,
+          // };
+          // return;
+          // 测面
+          this.mapRanging = true;
+          this.$nextTick(() => {
+            this.rangingMap = new Map({
+              layers: [this.initBaseLayer(this.defaultMap.baseLayers[1])],
+              view: this.view,
+              target: "ranging",
+              controls: [],
+            });
+            const obj1 = {
+              name: "item_map2",
+              type: "Polygon", // Point,LineString,Polygon,Circle
+              single: true,
+              style: {
+                fill: {
+                  color: "rgba(255, 255, 0, 0.5)",
+                },
+                stroke: {
+                  width: 2,
+                  color: "#ffff00",
+                },
+                // image: {
+                //   src: require('./image/icon-position-blue.png')
+                // }
+              },
+            };
+            this.drawLayerLC(obj1, function (callback) {});
+
+            for (const k in this.wmsLayerObj) {
+              this.drawLayerObj1[k] = this.wmsLayerObj[k];
+              this.rangingMap.addLayer(this.wmsLayerObj[k]);
+            }
+
+            for (const k in this.drawLayerObj) {
+              this.drawLayerObj1[k] = this.drawLayerObj[k];
+              this.rangingMap.addLayer(this.drawLayerObj[k]);
+            }
+            var scaleLineControl = new ScaleLine({
+              Units: "metric", // 单位有5种：degrees imperial us nautical metric
+            });
+
+            this.rangingMap.addControl(scaleLineControl);
+          });
+          break;
+        case 6:
+          // 框选
+          this.mapRanging = true;
+          this.$nextTick(() => {
+            this.rangingMap = new Map({
+              layers: [this.initBaseLayer(this.defaultMap.baseLayers[1])],
+              view: this.view,
+              target: "ranging",
+              controls: [],
+            });
+            const obj1 = {
+              name: "item_map2",
+              type: "Circle", // Point,LineString,Polygon,Circle
+              geometryFunction: createBox(),
+              single: true,
+              style: {
+                fill: {
+                  color: "rgba(255, 255, 0, 0)",
+                },
+                stroke: {
+                  width: 2,
+                  color: "#ffff00",
+                },
+                // image: {
+                //   src: require('./image/icon-position-blue.png')
+                // }
+              },
+            };
+            this.drawLayerLC(obj1, function (callback) {});
+
+            for (const k in this.wmsLayerObj) {
+              this.drawLayerObj1[k] = this.wmsLayerObj[k];
+              this.rangingMap.addLayer(this.wmsLayerObj[k]);
+            }
+
+            for (const k in this.drawLayerObj) {
+              this.drawLayerObj1[k] = this.drawLayerObj[k];
+              this.rangingMap.addLayer(this.drawLayerObj[k]);
+            }
+            var scaleLineControl = new ScaleLine({
+              Units: "metric", // 单位有5种：degrees imperial us nautical metric
+            });
+
+            this.rangingMap.addControl(scaleLineControl);
+          });
+          break;
+
+        default:
+          break;
+      }
+    },
+    createMeasureTooltip() {
+      if (this.measureTooltipElement) {
+        this.measureTooltipElement.parentNode.removeChild(
+          this.measureTooltipElement
+        );
+      }
+      this.measureTooltipElement = document.createElement("div");
+      this.measureTooltipElement.className = "ol-tooltip ol-tooltip-measure";
+      this.measureTooltip = new Overlay({
+        element: this.measureTooltipElement,
+        offset: [0, -15],
+        positioning: "bottom-center",
+        stopEvent: false,
+        insertFirst: false,
+      });
+      // this.drawElements.push(this.measureTooltip);
+      this.rangingMap.addOverlay(this.measureTooltip);
+    },
+    drawLayerLC(data, callback) {
+      const _this = this;
+
+      const name = data.name;
+
+      const style = data.style || this.defaultMap.defaultStyle;
+
+      if (this.draw) {
+        this.rangingMap.removeInteraction(this.draw);
+      }
+      if (this.snap) {
+        this.rangingMap.removeInteraction(this.snap);
+      }
+
+      if (!this.drawLayerObj1[name]) {
+        this.drawLayerObj1[name] = new VectorLayer({
+          source: new VectorSource(),
+          name: name,
+        });
+
+        this.drawLayerObj1[name].setStyle(_this.setCoordStyle(style));
+        /* this.rangingMap.addLayer(this.drawLayerObj1[name]) */
+
+        this.rangingMap.addLayer(this.drawLayerObj1[name]);
+      }
+
+      let maxPoints;
+
+      this.draw = new Draw({
+        source: this.drawLayerObj1[name].getSource(),
+        type: data.type, // Point,LineString,Polygon,Circle
+        // 几何信息变更时调用函数
+        geometryFunction: data.geometryFunction || "",
+        // 最大点数
+        maxPoints: maxPoints,
+      });
+
+      this.draw.setActive(true);
+      this.rangingMap.addInteraction(this.draw);
+      /* console.log(this.draw);
+      return; */
+
+      this.snap = new Snap({
+        source: this.drawLayerObj1[name].getSource(),
+      });
+      this.rangingMap.addInteraction(this.snap);
+      this.createMeasureTooltip();
+
+      this.draw.on(
+        "drawstart",
+        function (evt) {
+          if (data.single == true) {
+            _this.drawLayerObj1[name].getSource().clear();
+          }
+          var lastCoord = _this.drawLayerObj1[name]
+            .getSource()
+            .getFeatures()[0]; // 取第一个坐标
+          var lasttype;
+          if (lastCoord) {
+            lasttype = lastCoord.getGeometry().getType();
+          }
+          if (!lasttype || lasttype != data.type) {
+            _this.drawLayerObj1[name].getSource().clear();
+          }
+
+          // const that = this;
+          this.feature = evt.feature;
+
+          let tooltipCoord = evt.coordinate;
+
+          this.listener = this.feature
+            .getGeometry()
+            .on("change", function (evt) {
+              const geom = evt.target;
+              let output = "";
+              if (data.type == "LineString") {
+                output = getLength(geom, {
+                  radius: 6378137,
+                  projection: "EPSG:4326",
+                });
+                output = formatLength(output);
+              } else if (data.type == "Polygon" || data.type == "Circle") {
+                output = getArea(geom, {
+                  radius: 6378137,
+                  projection: "EPSG:4326",
+                });
+                output = formatLength(output);
+              }
+
+              tooltipCoord = geom.getLastCoordinate();
+
+              _this.measureTooltipElement.innerHTML = output;
+              _this.measureTooltip.setPosition(tooltipCoord);
+            });
+        },
+        this
+      );
+
+      // 格式化长度
+      const formatLength = function (val) {
+        // 单位换算,取小数点后2位数
+        if (data.type === "LineString") {
+          if (val > 100) {
+            val = Math.round((val / 1000) * 100) / 100 + " " + "km";
+          } else {
+            val = Math.round(val * 100) / 100 + " " + "m";
+          }
+        }
+
+        if (data.type === "Polygon" || data.type == "Circle") {
+          if (val > 10000) {
+            val =
+              Math.round((val / 1000000) * 100) / 100 + " " + "km<sup>2</sup>";
+          } else {
+            val = Math.round(val * 100) / 100 + " " + "m<sup>2</sup>";
+          }
+        }
+        return val;
+      };
+
+      this.draw.on(
+        "drawend",
+        function (e) {
+          var feature = e.feature;
+          var features = _this.drawLayerObj1[name].getSource().getFeatures();
+          features.push(feature); // 到第十个以后顺序会错乱
+          feature.setStyle(_this.setCoordStyle(style));
+          if (callback && typeof callback == "function") {
+            setTimeout(function () {
+              var returnData = _this.getAllTypeValue(
+                features,
+                data.isOpenDFM,
+                data.fractionDigits
+              );
+              /* console.log('returnData', returnData); */
+              callback.call(_this.drawLayerObj1[name], returnData, features);
+            }, 100);
+          }
+        },
+        this
+      );
+    },
+
+    //显示新卷帘
+    showRollerNew() {
+      this.mapRollerNew = true;
+      this.yearValue1 = this.rollerYear;
+      this.yearValue2 = this.rollerYear;
+
+      this.toolData["rollernew_1_layerObj"] = {};
+      this.toolData["rollernew_2_layerObj"] = {};
+
+      const currParam = this.defaultMap.baseLayers[this.baseLayerIndex];
+      const currLayer = this.initBaseLayer(currParam);
+
+      this.toolData["rollernew_1_layerObj"][currParam.name] = currLayer;
+      this.toolData["rollernew_2_layerObj"][currParam.name] = currLayer;
+
+      this.$nextTick(() => {
+        this.rollerMap1 = new Map({
+          layers: [
+            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
+          ],
+          // view: this.doubleView,
+          view: this.view,
+          target: "roller1",
+          controls: [],
+        });
+        this.rollerMap2 = new Map({
+          layers: [
+            this.initBaseLayer(this.defaultMap.baseLayers[this.baseLayerIndex]),
+          ],
+          // view: this.rollerMap1.getView(),
+          view: this.view,
+          target: "roller2",
+          controls: [],
+        });
+
+        this.rollerIndexNew1 = 0;
+        this.rollerIndexNew2 = 1;
+
+        const layer_1 = this.defaultMap.imageLayers[this.rollerIndexNew1];
+        const temp_1 = this.initImageLayer(layer_1);
+        const layer_2 = this.defaultMap.imageLayers[this.rollerIndexNew2];
+        const temp_2 = this.initImageLayer(layer_2);
+
+        this.toolData["rollernew_1_layerObj"][layer_1.name] = temp_1;
+        this.toolData["rollernew_2_layerObj"][layer_2.name] = temp_2;
+
+        this.addLayer(this.rollerMap1, { layer: temp_1, position: 1 });
+        this.addLayer(this.rollerMap2, { layer: temp_2, position: 1 });
+
+        //显示注记图层
+        if (this.showNoteLayer) {
+          const noteLayer = this.baseLayerObj[currParam.noteName];
+          this.addLayer(this.rollerMap1, { layer: noteLayer, position: 10 });
+          this.addLayer(this.rollerMap2, { layer: noteLayer, position: 10 });
+          this.toolData["rollernew_1_layerObj"][currParam.noteName] = noteLayer;
+          this.toolData["rollernew_2_layerObj"][currParam.noteName] = noteLayer;
+        }
+        for (const k in this.drawLayerObj) {
+          if (Object.hasOwnProperty.call(this.drawLayerObj, k)) {
+            const v = this.drawLayerObj[k];
+            if (v.values_.visible) {
+              // v.values_.visible = false;
+              this.addLayer(this.rollerMap1, {
+                layer: lodash.cloneDeep(v),
+                position: v.values_.zIndex,
+              });
+              this.addLayer(this.rollerMap2, {
+                layer: lodash.cloneDeep(v),
+                position: v.values_.zIndex,
+              });
+              this.toolData["rollernew_1_layerObj"][k] = lodash.cloneDeep(v);
+              // this.toolData['rollernew_1_layerObj']['A111111'] = 'A1';
+              this.toolData["rollernew_2_layerObj"][k] = lodash.cloneDeep(v);
+              // this.toolData['rollernew_2_layerObj']['A111111'] = 'A1';
+            }
+          }
+        }
+
+        for (const k in this.wmsLayerObj) {
+          if (Object.hasOwnProperty.call(this.wmsLayerObj, k)) {
+            const v = this.wmsLayerObj[k];
+            if (v.values_.visible) {
+              this.addLayer(this.rollerMap1, {
+                layer: lodash.cloneDeep(v),
+                position: v.values_.zIndex,
+              });
+              this.addLayer(this.rollerMap2, {
+                layer: lodash.cloneDeep(v),
+                position: v.values_.zIndex,
+              });
+              this.toolData["rollernew_1_layerObj"][k] = lodash.cloneDeep(v);
+              this.toolData["rollernew_2_layerObj"][k] = lodash.cloneDeep(v);
+            }
+          }
+        }
+      });
+    },
+
+    //关闭新卷帘
+    rollerNewClose() {
+      for (const k in this.toolData["rollernew_1_layerObj"]) {
+        if (
+          Object.hasOwnProperty.call(this.toolData["rollernew_1_layerObj"], k)
+        ) {
+          const v = this.toolData["rollernew_1_layerObj"][k];
+          this.rollerMap1.removeLayer(v);
+        }
+      }
+      for (const k in this.toolData["rollernew_2_layerObj"]) {
+        if (
+          Object.hasOwnProperty.call(this.toolData["rollernew_2_layerObj"], k)
+        ) {
+          const v = this.toolData["rollernew_2_layerObj"][k];
+          this.rollerMap2.removeLayer(v);
+        }
+      }
+      this.toolData["rollernew_1_layerObj"] = {};
+      this.toolData["rollernew_2_layerObj"] = {};
+      this.rollerMap1 = null;
+      this.rollerMap2 = null;
+      this.mapRollerNew = false;
+    },
+    // 测距关闭按钮
+    rangingClose() {
+      this.rangingMap = null;
+      this.drawLayerObj1 = [];
+      this.mapRanging = false;
+      this.radioSelect = "";
+    },
     // 显示卷帘
     showRoller(year = this.year) {
       this.mapRoller = true;
 
       let index = 0;
-      this.toolData['roller_layerObj'] = {};
+      this.toolData["roller_layerObj"] = {};
 
       const currParam = this.defaultMap.baseLayers[this.baseLayerIndex];
       const currLayer = this.initBaseLayer(currParam);
@@ -1625,8 +2784,8 @@ export default {
         this.rollerMap = new Map({
           layers: [currLayer],
           view: this.view,
-          target: 'roller',
-          controls: []
+          target: "roller",
+          controls: [],
         });
 
         this.rollerImages1 = deepClone(this.defaultMap.imageLayers);
@@ -1653,8 +2812,8 @@ export default {
         this.rollerIndex1 = index + 1;
         this.rollerIndex2 = index;
 
-        this.toolData['roller_layerObj'][layer_1.name] = temp_1;
-        this.toolData['roller_layerObj'][layer_2.name] = temp_2;
+        this.toolData["roller_layerObj"][layer_1.name] = temp_1;
+        this.toolData["roller_layerObj"][layer_2.name] = temp_2;
 
         this.addLayer(this.rollerMap, { layer: temp_1, position: 1 });
         this.addLayer(this.rollerMap, { layer: temp_2, position: 2 });
@@ -1664,7 +2823,7 @@ export default {
         if (this.showNoteLayer) {
           const noteLayer = this.baseLayerObj[currParam.noteName];
           this.addLayer(this.rollerMap, { layer: noteLayer, position: 10 });
-          this.toolData['roller_layerObj'][currParam.noteName] = noteLayer;
+          this.toolData["roller_layerObj"][currParam.noteName] = noteLayer;
         }
 
         for (const k in this.drawLayerObj) {
@@ -1673,9 +2832,9 @@ export default {
             if (v.values_.visible) {
               this.addLayer(this.rollerMap, {
                 layer: v,
-                position: v.values_.zIndex
+                position: v.values_.zIndex,
               });
-              this.toolData['roller_layerObj'][k] = v;
+              this.toolData["roller_layerObj"][k] = v;
             }
           }
         }
@@ -1686,9 +2845,9 @@ export default {
             if (v.values_.visible) {
               this.addLayer(this.rollerMap, {
                 layer: v,
-                position: v.values_.zIndex
+                position: v.values_.zIndex,
               });
-              this.toolData['roller_layerObj'][k] = v;
+              this.toolData["roller_layerObj"][k] = v;
             }
           }
         }
@@ -1697,16 +2856,15 @@ export default {
 
     //关闭卷帘
     hideRoller() {
-      for (const k in this.toolData['roller_layerObj']) {
-        if (Object.hasOwnProperty.call(this.toolData['roller_layerObj'], k)) {
-          const v = this.toolData['roller_layerObj'][k];
+      for (const k in this.toolData["roller_layerObj"]) {
+        if (Object.hasOwnProperty.call(this.toolData["roller_layerObj"], k)) {
+          const v = this.toolData["roller_layerObj"][k];
           this.rollerMap.removeLayer(v);
         }
       }
-      this.toolData['roller_layerObj'] = {};
+      this.toolData["roller_layerObj"] = {};
       this.rollerMap = null;
       this.mapRoller = false;
-      this.$emit('hideRoller');
     },
 
     // 打开卷帘切换选项
@@ -1732,13 +2890,13 @@ export default {
         this.rollerImages2[index].disable
       ) {
         this.$message({
-          message: '该年版已展示，左右两侧不能使用相同年版',
-          type: 'error'
+          message: "该年版已展示，左右两侧不能使用相同年版",
+          type: "error",
         });
         return;
       }
 
-      let layer = '';
+      let layer = "";
       if (tag === 1) {
         layer = this.rollerImages1[index];
         this.rollerTitle1 = layer.title;
@@ -1758,7 +2916,7 @@ export default {
       }
 
       for (let key in this.toolData[`roller_layerObj`]) {
-        if (key !== layer.name && key.indexOf('image_layer_') == 0) {
+        if (key !== layer.name && key.indexOf("image_layer_") == 0) {
           //   this.toolData[`roller_layerObj`][key].setVisible(false);
           this.rollerMap.removeLayer(this.toolData[`roller_layerObj`][key]);
         }
@@ -1772,8 +2930,8 @@ export default {
       const layer_2 = this.rollerImages2[this.rollerIndex2];
       const temp_2 = this.initImageLayer(layer_2);
 
-      this.toolData['roller_layerObj'][layer_1.name] = temp_1;
-      this.toolData['roller_layerObj'][layer_2.name] = temp_2;
+      this.toolData["roller_layerObj"][layer_1.name] = temp_1;
+      this.toolData["roller_layerObj"][layer_2.name] = temp_2;
 
       this.addLayer(this.rollerMap, { layer: temp_1, position: 1 });
       this.addLayer(this.rollerMap, { layer: temp_2, position: 2 });
@@ -1792,7 +2950,7 @@ export default {
         return;
       }
       //   let layer = this.imageLayerObj[this.defaultMap.imageLayers[1].name];
-      layer.on('prerender', (event) => {
+      layer.on("prerender", (event) => {
         /* var ctx = event.context;
         var width = ctx.canvas.width * (this.rollerValue / 100);
         //$('#swipeSplit').css({ 'left': width + "px" });
@@ -1818,18 +2976,18 @@ export default {
         ctx.closePath();
         ctx.clip();
       });
-      layer.on('postrender', (event) => {
+      layer.on("postrender", (event) => {
         var ctx = event.context;
         ctx.restore();
       });
     },
 
     handleMapSelect(type) {
-      if (type === 'image') {
+      if (type === "image") {
         this.defaultMap.imageActive = !this.defaultMap.imageActive;
         this.defaultMap.toolActive = false;
       } else {
-        if (this.defaultMap.toolTitle !== '工具') {
+        if (this.defaultMap.toolTitle !== "工具") {
           this.defaultMap.toolActive = false;
           return;
         }
@@ -1850,19 +3008,19 @@ export default {
     showMeasure(type) {
       if (!type) {
         this.$message({
-          message: '类型错误',
-          type: 'error',
-          duration: 4000
+          message: "类型错误",
+          type: "error",
+          duration: 4000,
         });
       }
 
       // 不管如何先关闭提示框
-      this.map.on('click', this.hideTips);
+      this.map.on("click", this.hideTips);
 
-      this.defaultMap.toolTitle = '测距';
+      this.defaultMap.toolTitle = "测距";
 
       const obj = {};
-      obj.name = 'measure_layer';
+      obj.name = "measure_layer";
       obj.type = type;
       obj.modify = true;
       obj.single = true;
@@ -1876,21 +3034,21 @@ export default {
         //   width: 4
         // },
         fill: {
-          color: 'rgba(255, 255, 0, 0)'
+          color: "rgba(255, 255, 0, 0)",
         },
         stroke: {
           width: 2,
-          color: '#ffff00'
-        }
+          color: "#ffff00",
+        },
       };
 
-      let tips = document.createElement('div');
-      tips.className = 'map-tips';
+      let tips = document.createElement("div");
+      tips.className = "map-tips";
 
       this.tips = new Overlay({
         element: tips,
         offset: [0, -15],
-        positioning: 'bottom-center'
+        positioning: "bottom-center",
       });
       this.map.addOverlay(this.tips);
 
@@ -1899,20 +3057,20 @@ export default {
         let val = this.getAreaByWkt(callback.wktValue);
 
         // 单位换算,取小数点后2位数
-        if (type === 'LineString') {
+        if (type === "LineString") {
           if (val > 100) {
-            val = Math.round((val / 1000) * 100) / 100 + ' ' + 'km';
+            val = Math.round((val / 1000) * 100) / 100 + " " + "km";
           } else {
-            val = Math.round(val * 100) / 100 + ' ' + 'm';
+            val = Math.round(val * 100) / 100 + " " + "m";
           }
         }
 
-        if (type === 'Polygon') {
+        if (type === "Polygon") {
           if (val > 10000) {
             val =
-              Math.round((val / 1000000) * 100) / 100 + ' ' + 'km<sup>2</sup>';
+              Math.round((val / 1000000) * 100) / 100 + " " + "km<sup>2</sup>";
           } else {
-            val = Math.round(val * 100) / 100 + ' ' + 'm<sup>2</sup>';
+            val = Math.round(val * 100) / 100 + " " + "m<sup>2</sup>";
           }
         }
 
@@ -1931,7 +3089,7 @@ export default {
     hideMeasure() {
       // 清除绘制图层
       const obj = {};
-      obj.name = 'measure_layer';
+      obj.name = "measure_layer";
       obj.active = false;
       this.clearDrawLayer(obj);
 
@@ -1939,11 +3097,11 @@ export default {
       this.hideTips();
 
       // 恢复标题
-      this.defaultMap.toolTitle = '工具';
+      this.defaultMap.toolTitle = "工具";
     },
 
     changeStyleFontSize(obj) {
-      this.view.on('change:resolution', () => {
+      this.view.on("change:resolution", () => {
         let initSize = 2;
         if (obj.areaCode && obj.areaCode.length > 2) {
           initSize = 1;
@@ -1953,7 +3111,7 @@ export default {
         }
         const zoom = this.view.getZoom();
         const scale = zoom * initSize;
-        const font = 'normal ' + scale + 'px 微软雅黑';
+        const font = "normal " + scale + "px 微软雅黑";
         //console.log(zoom + 'x' + initSize + '=' + scale);
 
         var features = this.drawLayerObj[obj.layerName]
@@ -1977,27 +3135,27 @@ export default {
         return;
       }
 
-      let url = obj.url || 'http://gisserver.tianditu.gov.cn/TDTService/wfs';
-      let typeName = obj.typeName || 'HYDA';
+      let url = obj.url || "http://gisserver.tianditu.gov.cn/TDTService/wfs";
+      let typeName = obj.typeName || "HYDA";
       var vs = new VectorSource({
         format: new GeoJSON(),
-        projection: 'EPSG:4326',
+        projection: "EPSG:4326",
         url: (extent) => {
           //console.log(extent);
           return (
             url +
-            '?service=WFS&' +
-            'version=1.1.0&request=GetFeature&typeName=' +
+            "?service=WFS&" +
+            "version=1.1.0&request=GetFeature&typeName=" +
             typeName +
-            '&' +
-            'outputFormat=application/json&srsname=EPSG:4326&' +
-            'bbox=' +
+            "&" +
+            "outputFormat=application/json&srsname=EPSG:4326&" +
+            "bbox=" +
             //extent.join(",") +
-            this.defaultMap.extent.join(',') +
-            ',EPSG:4326'
+            this.defaultMap.extent.join(",") +
+            ",EPSG:4326"
           );
         },
-        strategy: bboxStrategy
+        strategy: bboxStrategy,
       });
 
       this.drawLayerObj[name] = new VectorLayer({
@@ -2006,19 +3164,19 @@ export default {
           //添加显示的样式
           image: new olStyleCircle({
             stroke: new olStyleStroke({
-              color: '#26FFFF',
-              width: 1.25
+              color: "#26FFFF",
+              width: 1.25,
             }),
             radius: 15,
             fill: new olStyleFill({
-              color: '#26FFFF'
-            })
+              color: "#26FFFF",
+            }),
           }),
           stroke: new olStyleStroke({
             color: obj.color,
-            width: 1
-          })
-        })
+            width: 1,
+          }),
+        }),
       });
       this.drawLayerObj[name].setZIndex(0);
 
@@ -2049,9 +3207,9 @@ export default {
     // 初始化图层信息
     initBaseLayer: function (layObj) {
       return new TileLayer({
-        name: layObj.name || '',
-        index: layObj.index || '',
-        title: layObj.title || '',
+        name: layObj.name || "",
+        index: layObj.index || "",
+        title: layObj.title || "",
         visible: layObj.visible || true,
         source: new XYZ({
           //url: layObj.url,
@@ -2060,15 +3218,15 @@ export default {
             let z = tileCoord[0];
             let x = tileCoord[1];
             let y = tileCoord[2];
-            url = url.split('{0}').join(z);
-            url = url.split('{1}').join(x);
-            url = url.split('{2}').join(y);
+            url = url.split("{0}").join(z);
+            url = url.split("{1}").join(x);
+            url = url.split("{2}").join(y);
             return url;
           },
           wrapX: layObj.wrapX || false, //是否在水平线上重复
-          projection: layObj.projection || 'EPSG:4326',
-          crossOrigin: 'anonymous'
-        })
+          projection: layObj.projection || "EPSG:4326",
+          crossOrigin: "anonymous",
+        }),
       });
     },
 
@@ -2173,7 +3331,7 @@ export default {
 
         layersArray.forEach((v, k) => {
           // 获取注记图层的键值，并移除
-          if (v.get('name') == baseParam.noteName) {
+          if (v.get("name") == baseParam.noteName) {
             layers.removeAt(k);
           }
         });
@@ -2182,9 +3340,9 @@ export default {
           index: 0,
           url: baseParam.noteUrl,
           name: baseParam.noteName,
-          title: '天地图注记',
+          title: "天地图注记",
           type: 1,
-          active: true
+          active: true,
         };
 
         noteLayer = this.initBaseLayer(noteParam);
@@ -2235,7 +3393,7 @@ export default {
       const list = [];
 
       if (this.imageFetch) {
-        const api = require('@/api/data');
+        const api = require("@/api/data");
         const query = {};
         query.status = 1;
         const res = await api.fetchMapImageList(query);
@@ -2244,13 +3402,13 @@ export default {
           const temp = {};
           temp.index = 0;
           temp.url = v.mapUrl;
-          temp.name = 'image_layer_' + k;
+          temp.name = "image_layer_" + k;
           temp.title = v.biName;
           temp.type = parseInt(v.imageType);
           temp.active = false;
           temp.origin = v.origin;
           temp.time = v.imageTime;
-          temp.no = 'GS(2020)3758号';
+          temp.no = "GS(2020)3758号";
           list.push(temp);
         });
 
@@ -2259,79 +3417,79 @@ export default {
       }
 
       // 赋值中心点和显示范围
-      if (JSON.stringify(this.$store.getters.extent) !== '{}') {
+      if (JSON.stringify(this.$store.getters.extent) !== "{}") {
         this.defaultMap.extent = this.$store.getters.extent;
         this.defaultMap.center = new getCenter(this.defaultMap.extent);
         this.fitByExtent(this.$store.getters.extent, true, {
-          padding: [100, 0, 100, 0]
+          padding: [100, 0, 100, 0],
         });
       }
     },
 
     // 初始化影像图层
     initImageLayer: function (obj) {
-      let tileGrid = '';
+      let tileGrid = "";
       tileGrid = new TileGrid({
         resolutions: [
           0.703125, 0.3515625, 0.17578125, 0.087890625, 0.0439453125,
           0.02197265625, 0.010986328125, 0.0054931640625, 0.00274658203125,
           0.001373291015625, 0.0006866455078125, 0.00034332275390625,
           0.000171661376953125, 0.0000858306884765625, 0.0000429153442382812,
-          0.0000214576721191406, 0.0000107288360595703, 0.00000536441802978515
+          0.0000214576721191406, 0.0000107288360595703, 0.00000536441802978515,
         ],
         matrixIds: [
-          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17
+          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
         ],
-        origin: [-180, 90]
+        origin: [-180, 90],
       });
 
       let yx;
       //console.log(obj);
       if (obj.type == 1) {
         yx = new TileLayer({
-          name: obj.name || '',
-          index: obj.index || '',
-          title: obj.title || '',
+          name: obj.name || "",
+          index: obj.index || "",
+          title: obj.title || "",
           visible: obj.visible || true,
           source: new XYZ({
-            crossOrigin: 'anonymous',
-            projection: 'EPSG:4326',
+            crossOrigin: "anonymous",
+            projection: "EPSG:4326",
             //tileGrid: tileGrid,
             tileUrlFunction: function (tileCoord) {
               let url = obj.url;
               let z = tileCoord[0];
               let x = tileCoord[1];
               let y = tileCoord[2];
-              url = url.split('{0}').join(z);
-              url = url.split('{1}').join(x);
-              url = url.split('{2}').join(y);
+              url = url.split("{0}").join(z);
+              url = url.split("{1}").join(x);
+              url = url.split("{2}").join(y);
               return url;
             },
-            wrapX: true
-          })
+            wrapX: true,
+          }),
         });
       } else {
         yx = new TileLayer({
-          name: obj.name || '',
-          index: obj.index || '',
-          title: obj.title || '',
+          name: obj.name || "",
+          index: obj.index || "",
+          title: obj.title || "",
           visible: obj.visible || true,
           source: new XYZ({
-            crossOrigin: 'anonymous',
-            projection: 'EPSG:4326',
+            crossOrigin: "anonymous",
+            projection: "EPSG:4326",
             tileGrid: tileGrid,
             tileUrlFunction: function (tileCoord) {
               let url = obj.url;
               let z = tileCoord[0];
               let x = tileCoord[1];
               let y = tileCoord[2];
-              url = url.split('{0}').join(z);
-              url = url.split('{1}').join(x);
-              url = url.split('{2}').join(y);
+              url = url.split("{0}").join(z);
+              url = url.split("{1}").join(x);
+              url = url.split("{2}").join(y);
               return url;
             },
-            wrapX: true
-          })
+            wrapX: true,
+          }),
         });
       }
       return yx;
@@ -2357,7 +3515,7 @@ export default {
         this.addLayer(this.map, { layer: temp, position: 5 });
       }
 
-      this.defaultMap.imageTitle = layer.active ? layer.title : '天地图';
+      this.defaultMap.imageTitle = layer.active ? layer.title : "天地图";
       this.imageLayerInfo = layer;
 
       for (let key in this.imageLayerObj) {
@@ -2403,15 +3561,15 @@ export default {
       polygonRing.appendLinearRing(linearRing);
       //把数据生成Feature
       let Polygons = new Feature({
-        geometry: polygonRing
+        geometry: polygonRing,
       });
       //实例化一个矢量图层Vector作为绘制层
       let vectorSource = new VectorSource({
-        features: [Polygons]
+        features: [Polygons],
         // features: geoJson.readFeatures(area),
       });
 
-      const name = 'area_mask_layer';
+      const name = "area_mask_layer";
 
       if (this.drawLayerObj[name]) {
         this.map.removeLayer(this.drawLayerObj[name]);
@@ -2423,14 +3581,14 @@ export default {
         name: name,
         style: new olStyle({
           fill: new olStyleFill({
-            color: 'rgba(0,0,0,.9)'
-          })
+            color: "rgba(0,0,0,.9)",
+          }),
           //   stroke: new olStyleStroke({
           //     lineDash: [1, 2, 3, 4, 5],
           //     color: '#ffcc33',
           //     width: 4,
           //   }),
-        })
+        }),
       });
 
       this.drawLayerObj[name] = vector;
@@ -2443,21 +3601,21 @@ export default {
 
     initWmsLayer: function (layObj) {
       return new TileLayer({
-        name: layObj.name || '',
+        name: layObj.name || "",
         visible: layObj.visible,
         source: new TileWMS({
           url: layObj.url,
           params: {
-            FORMAT: layObj.format || 'image/png',
-            VERSION: layObj.version || '1.1.1',
+            FORMAT: layObj.format || "image/png",
+            VERSION: layObj.version || "1.1.1",
             TILED: layObj.tiled || true,
             LAYERS: layObj.layers,
-            EXCEPTIONS: 'application/vnd.ogc.se_inimage',
+            EXCEPTIONS: "application/vnd.ogc.se_inimage",
             //tilesOrigin: obj.tilesOrigin,
-            CQL_FILTER: layObj.filter || '1=1',
-            STYLES: layObj.styles
-          }
-        })
+            CQL_FILTER: layObj.filter || "1=1",
+            STYLES: layObj.styles,
+          },
+        }),
       });
 
       /* return new TileLayer({
@@ -2477,22 +3635,36 @@ export default {
     //添加比例尺
     addScaleLint: function () {
       var scaleLineControl = new ScaleLine({
-        Units: 'metric' //单位有5种：degrees imperial us nautical metric
+        Units: "metric", //单位有5种：degrees imperial us nautical metric
       });
 
       this.map.addControl(scaleLineControl);
     },
 
     // 地图放大
-    zoomIn: function () {
-      let zoom = this.view.getZoom();
-      this.view.setZoom(zoom + 1);
+    zoomIn(zoomNum) {
+      // this.terrainSmallSelect = 2;
+      let zoom = zoomNum || this.view.getZoom() + 2;
+      if (this.mapAnimation) {
+        this.view.animate({
+          zoom,
+        });
+      } else {
+        this.view.setZoom(zoom);
+      }
     },
 
     // 地图缩小
-    zoomOut: function () {
-      let zoom = this.view.getZoom();
-      this.view.setZoom(zoom - 1);
+    zoomOut(zoomNum) {
+      // this.terrainSmallSelect = 1;
+      let zoom = zoomNum || this.view.getZoom() - 2;
+      if (this.mapAnimation) {
+        this.view.animate({
+          zoom,
+        });
+      } else {
+        this.view.setZoom(zoom);
+      }
     },
 
     updateSize: function () {
@@ -2512,9 +3684,11 @@ export default {
 
     loadFeatures: function (coordsArr, textField, coordField, coordsStyle) {
       let features = [];
-      for (let i = 0; i < coordsArr.length; i++) {
+      let coordsArrLength = coordsArr?.length;
+      for (let i = 0; i < coordsArrLength; i++) {
         let coordsObj = coordsArr[i];
         let showText = coordsObj[textField];
+        let cloneNum = coordsObj.cloneNum || 1;
         let feature = this.showCoordinate(
           coordsObj[coordField],
           null,
@@ -2538,11 +3712,21 @@ export default {
         if (feature) {
           feature.setStyle(this.setCoordStyle(style));
           features.push(feature);
+          if (cloneNum > 1) {
+            let geometry = feature.getGeometry();
+            for (let num = 1; num < cloneNum; num++) {
+              // 循环值过大时需要考虑性能提升
+              features.push(
+                new Feature({
+                  geometry,
+                })
+              );
+            }
+          }
         }
       }
       return features;
     },
-
     // 添加坐标图层，根据坐标添加图层
     addCoordinateLayer: function (dataOption) {
       /*
@@ -2553,21 +3737,29 @@ export default {
          */
       //debugger
       //console.log(dataOption);
-      let textField = dataOption.textField || 'name';
-      let idField = dataOption.idField || 'id';
-      let coordField = dataOption.coordField || 'coord';
+      let textField = dataOption.textField || "name";
+      let idField = dataOption.idField || "id";
+      let coordField = dataOption.coordField || "coord";
       let name = dataOption.name; //图层名称
       let coordsArr = dataOption.coordsArr; //图层数组对象[{coord:"point(112 26)",olstyle:obj,id:'1',...}]coord:wkt坐标，id;数据唯一标识，点击事件绑定用，style点、线、面的独立样式
       let coordsStyle = dataOption.coordsStyle; //绘制的样式，若coordsArr未自定义olstyle，使用公共的样式去设置
+      let heatMapStyle = dataOption.heatMapStyle || {};
 
       if (this.drawLayerObj[name]) {
         this.drawLayerObj[name].getSource().clear();
       } else {
-        this.drawLayerObj[name] = new VectorLayer({
-          source: new VectorSource(),
-          name: name
-        });
-
+        if (dataOption.isHeatMap) {
+          this.drawLayerObj[name] = new Heatmap({
+            source: new VectorSource(),
+            name: name,
+            ...heatMapStyle,
+          });
+        } else {
+          this.drawLayerObj[name] = new VectorLayer({
+            source: new VectorSource(),
+            name: name,
+          });
+        }
         if (dataOption.position) {
           var layersArray = this.map.getLayers();
           layersArray.insertAt(dataOption.position, this.drawLayerObj[name]);
@@ -2613,12 +3805,12 @@ export default {
       var geomTransform = null;
       var type = geom.getType();
       switch (type) {
-        case 'LineString':
-        case 'Point':
-        case 'Polygon':
-        case 'MultiPolygon':
-        case 'MultiLineString':
-        case 'MultiPoint':
+        case "LineString":
+        case "Point":
+        case "Polygon":
+        case "MultiPolygon":
+        case "MultiLineString":
+        case "MultiPoint":
           {
             var jstsGeom = OL3Parser.read(geom);
             var tol = buffer;
@@ -2633,13 +3825,22 @@ export default {
       return geomTransform;
     },
     //获取根据wkt值返回缓冲区的wkt
-    getBufferWkt: function (wkt, buffer) {
+    getBufferWkt: function (wkt, buffer, mapType) {
       var geometry = this.getBufferGeometry(
         wkt,
         buffer || this.trackPlayBackObj.buffer
       );
-      var bugfferWkt = new WKT().writeGeometry(geometry);
-      return bugfferWkt;
+
+      if (mapType == 'circle') {
+       let circle = this.getCircleGeometry(new getCenter(geometry.getExtent()),getWidth(geometry.getExtent()) / 2 )
+       return circle
+      } else {
+        var bugfferWkt = new WKT().writeGeometry(geometry);
+        return bugfferWkt;
+      }
+    },
+    getCircleGeometry(center, width) {
+      return new Circle(center, width)
     },
     // 判断巡护轨迹点是否在责任区或网格内
     judgeIsIntersectsCoordinate: function (wkt1, wkt2) {
@@ -2661,25 +3862,25 @@ export default {
             radius: 30,
             stroke: new olStyleStroke({
               width: 4,
-              color: 'red'
+              color: "red",
             }),
             fill: new olStyleFill({
-              color: 'green'
-            })
+              color: "green",
+            }),
           }),
           stroke: new olStyleStroke({
             width: 2,
-            color: '#ffff00'
-          })
+            color: "#ffff00",
+          }),
           /* fill: new olStyleFill({
             color: 'green'
           }) */
         }),
-        layers: [this.drawLayerObj[name]]
+        layers: [this.drawLayerObj[name]],
       });
 
       // 监听select事件
-      this.select.on('select', function (e) {
+      this.select.on("select", function (e) {
         /* console.log('select', e) */
 
         if (e.selected.length > 0) {
@@ -2689,12 +3890,12 @@ export default {
           /* console.log('namee', id) */
           /* document.getElementById('msg').innerText = '被选中的要素：' + name; */
 
-          if (callback && typeof callback == 'function') {
+          if (callback && typeof callback == "function") {
             callback.call(_this.drawLayerObj[name], res);
           }
         } else {
           const res = false;
-          if (callback && typeof callback == 'function') {
+          if (callback && typeof callback == "function") {
             callback.call(_this.drawLayerObj[name], res);
           }
         }
@@ -2703,19 +3904,28 @@ export default {
       // 添加单选工具
       this.map.addInteraction(this.select);
     },
-
+    //计算中心点
+    geometryFunc(feature) {
+      var geometry = feature.getGeometry();
+      if (geometry.getType() === "Point") {
+        return feature.getGeometry();
+      } else if (geometry.getType() === "MultiPolygon") {
+        return new Point(new getCenter(geometry.getExtent()));
+      }
+      return geometry.getInteriorPoint();
+    },
     //
     addClusterCoordinateArryLayer: function (dataOption) {
       //聚合显示
-      let textField = dataOption.textField || 'name';
-      let idField = dataOption.idField || 'id';
-      let coordField = dataOption.coordField || 'coord';
+      let textField = dataOption.textField || "name";
+      let idField = dataOption.idField || "id";
+      let coordField = dataOption.coordField || "coord";
       let name = dataOption.name; //图层名称
       let distance = dataOption.distance || 50;
       let coordsArr = dataOption.coordsArr; //图层数组对象[{coord:"point(112 26)",olstyle:obj,id:'1',...}]coord:wkt坐标，id;数据唯一标识，点击事件绑定用，style点、线、面的独立样式
       let coordsStyle = dataOption.coordsStyle; //绘制的样式，若coordsArr未自定义olstyle，使用公共的样式去设置
       let clusterStyle = dataOption.clusterStyle;
-      let unitName = dataOption.unitName || '';
+      let unitName = dataOption.unitName || "";
       let self = this;
 
       if (this.drawLayerObj[name]) {
@@ -2731,20 +3941,19 @@ export default {
         coordField,
         coordsStyle
       );
-
       let clusterSource = new ClusterSource({
         distance: distance,
         source: new VectorSource({
-          features: features
-        })
+          features: features,
+        }),
+        geometryFunction: this.geometryFunc, //获取多边形内点的方法
       });
-
       // else{
       this.drawLayerObj[name] = new VectorLayer({
         source: clusterSource,
         name: name,
         style: function (feature) {
-          var size = feature.get('features').length;
+          var size = feature.get("features").length;
           var style;
           if (size && size == 1) {
             style = feature.getProperties().features[0].getStyle();
@@ -2765,12 +3974,14 @@ export default {
             param.circle.radius = radius;
             if (clusterStyle) {
               if (clusterStyle.circle) {
-                /* param.circle.fill = clusterStyle.circle.fill;
-                param.circle.stroke = clusterStyle.circle.stroke; */
+                param.circle.fill = clusterStyle.circle.fill;
+                param.circle.stroke = clusterStyle.circle.stroke;
                 param.circle.image = clusterStyle.circle.image;
               }
               if (clusterStyle.text) {
                 param.text.fill = clusterStyle.text.fill;
+                param.text.font = clusterStyle.text.font;
+                param.text.offsetY = clusterStyle.text.offsetY;
               }
             }
             //coordsStyle.circle.radius=radius;
@@ -2778,9 +3989,8 @@ export default {
             style = self.setCoordStyle(param); //myMap.common.cluster.getStyle(param);
           }
           return style;
-        }
+        },
       });
-
       this.map.addLayer(this.drawLayerObj[name]);
       this.drawLayerObj[name].getSource().addFeatures(features);
 
@@ -2803,7 +4013,7 @@ export default {
 
       let eventTypeList = (
         dataOption.layerEventType || this.defaultMap.layerEventType
-      ).split(',');
+      ).split(",");
       eventTypeList.forEach((clickType) => {
         let eventFun = dataOption[clickType] || dataOption.vectorEventFun;
 
@@ -2811,15 +4021,20 @@ export default {
         if (eventFun) {
           const key = this.map.on(clickType, (e) => {
             this.drawLayerObj[name]
-              .getFeatures(e.pixel)
+              ?.getFeatures(e.pixel)
               .then((clickedFeatures) => {
                 //
                 if (clickedFeatures.length) {
                   // Get clustered Coordinates
-                  let features = clickedFeatures[0].get('features');
+                  let features = clickedFeatures[0].get("features");
                   if (features) {
                     if (features.length > 1) {
                       //返回聚合点的总数，大于1，地图级
+                      if (this.defaultMap.maxZoom <= this.getZoom()) {
+                        //聚合达到地图最大层级，可关联addPopup弹出对应点位选择
+                        eventFun.call(e, e.coordinate, features);
+                        return;
+                      }
                       this.zoomIn();
 
                       //根据点位，进行定位方法
@@ -2829,9 +4044,9 @@ export default {
                           wktArr.push(v.values_.attr[coordField]);
                         }
                       });
-                      this.fitByWKT(wktArr);
+                      this.fitByWKT(wktArr, true, dataOption.childFitOption);
 
-                      eventFun.call(e, '', null);
+                      eventFun.call(e, "clusterClick", null);
                     } else if (features.length == 1) {
                       let feature = features[0];
                       eventFun.call(e, e.coordinate, feature);
@@ -2856,6 +4071,8 @@ export default {
                   // }else if(features.length==1){
 
                   // }
+                } else {
+                  eventFun.call(e, "", null);
                 }
               });
           });
@@ -2873,78 +4090,78 @@ export default {
     // 新增绘制功能，未整理 START
 
     getByType: function (type, style, select) {
-      type = (type || '').toLocaleLowerCase();
+      type = (type || "").toLocaleLowerCase();
       var obj = {};
       style = style || {};
-      if (type == 'point' || type == 'multipoint') {
-        type = 'point';
+      if (type == "point" || type == "multipoint") {
+        type = "point";
         if (select != true) {
-          obj = $.extend({}, myMap.deafaultStyle['point'], style['point']);
+          obj = $.extend({}, myMap.deafaultStyle["point"], style["point"]);
           obj.text = $.extend(
             {},
-            myMap.deafaultStyle['text_select'],
-            style['text']
+            myMap.deafaultStyle["text_select"],
+            style["text"]
           );
         } else {
           obj = $.extend(
             {},
-            myMap.deafaultStyle['point_select'],
-            style['point_select']
+            myMap.deafaultStyle["point_select"],
+            style["point_select"]
           );
           obj.text = $.extend(
             {},
-            myMap.deafaultStyle['text_select'],
-            style['text_select']
+            myMap.deafaultStyle["text_select"],
+            style["text_select"]
           );
         }
-      } else if (type == 'linestring' || type == 'multilinestring') {
-        type = 'linestring';
+      } else if (type == "linestring" || type == "multilinestring") {
+        type = "linestring";
         if (select != true) {
           obj = $.extend(
             {},
-            myMap.deafaultStyle['linestring'],
-            style['linestring']
+            myMap.deafaultStyle["linestring"],
+            style["linestring"]
           );
           obj.text = $.extend(
             {},
-            myMap.deafaultStyle['text_select'],
-            style['text']
+            myMap.deafaultStyle["text_select"],
+            style["text"]
           );
         } else {
           obj = $.extend(
             {},
-            myMap.deafaultStyle['linestring_select'],
-            style['linestring_select']
+            myMap.deafaultStyle["linestring_select"],
+            style["linestring_select"]
           );
           obj.text = $.extend(
             {},
-            myMap.deafaultStyle['text_select'],
-            style['text_select']
+            myMap.deafaultStyle["text_select"],
+            style["text_select"]
           );
         }
-      } else if (type == 'polygon' || type == 'multipolygon') {
-        type = 'polygon';
+      } else if (type == "polygon" || type == "multipolygon") {
+        type = "polygon";
         if (select != true) {
-          obj = $.extend({}, myMap.deafaultStyle['polygon'], style['polygon']);
+          obj = $.extend({}, myMap.deafaultStyle["polygon"], style["polygon"]);
           obj.text = $.extend(
             {},
-            myMap.deafaultStyle['text_select'],
-            style['text_select']
+            myMap.deafaultStyle["text_select"],
+            style["text_select"]
           );
         } else {
           obj = $.extend(
             {},
-            myMap.deafaultStyle['polygon_select'],
-            style['polygon_select']
+            myMap.deafaultStyle["polygon_select"],
+            style["polygon_select"]
           );
           obj.text = $.extend(
             {},
-            myMap.deafaultStyle['text_select'],
-            style['text_select']
+            myMap.deafaultStyle["text_select"],
+            style["text_select"]
           );
         }
       } else {
-        type = 'commonStyle';
+        type = "commonStyle";
       }
       var style = this[type](obj);
       if (select == true) {
@@ -2980,7 +4197,7 @@ export default {
     resetView: function (data) {
       this.view.animate({
         center: this.defaultMap.center,
-        zoom: this.defaultMap.zoom
+        zoom: this.defaultMap.zoom,
       });
     },
 
@@ -2998,8 +4215,17 @@ export default {
       }
       if (!this.drawLayerObj[name]) {
         this.drawLayerObj[name] = new VectorLayer({
-          source: new VectorSource(),
-          name: name
+          source: data.wkt
+            ? new VectorSource({
+                //根据wkt值配置初始点线面
+                features: [
+                  new Feature({
+                    geometry: new WKT().readGeometry(data.wkt),
+                  }),
+                ],
+              })
+            : new VectorSource(),
+          name: name,
         });
         this.drawLayerObj[name].setStyle(this.setCoordStyle(style));
         /* this.map.addLayer(this.drawLayerObj[name]) */
@@ -3015,7 +4241,7 @@ export default {
         //几何信息变更时调用函数
         geometryFunction: geometryFunction,
         //最大点数
-        maxPoints: maxPoints
+        maxPoints: maxPoints,
       });
 
       this.draw.setActive(true);
@@ -3023,12 +4249,12 @@ export default {
       /* console.log(this.draw);
       return; */
       this.snap = new Snap({
-        source: this.drawLayerObj[name].getSource()
+        source: this.drawLayerObj[name].getSource(),
       });
       this.map.addInteraction(this.snap);
 
       this.draw.on(
-        'drawstart',
+        "drawstart",
         function (e) {
           if (data.single == true) {
             _this.drawLayerObj[name].getSource().clear();
@@ -3046,13 +4272,13 @@ export default {
       );
 
       this.draw.on(
-        'drawend',
+        "drawend",
         function (e) {
           var feature = e.feature;
           var features = _this.drawLayerObj[name].getSource().getFeatures();
           features.push(feature); //到第十个以后顺序会错乱
           feature.setStyle(_this.setCoordStyle(style));
-          if (callback && typeof callback == 'function') {
+          if (callback && typeof callback == "function") {
             setTimeout(function () {
               var returnData = _this.getAllTypeValue(
                 features,
@@ -3072,19 +4298,19 @@ export default {
 
         if (this.modify == null) {
           this.modify = new Modify({
-            source: this.drawLayerObj[name].getSource()
+            source: this.drawLayerObj[name].getSource(),
           });
 
           this.map.addInteraction(this.modify);
         }
 
         this.modify.on(
-          'modifyend',
+          "modifyend",
           function (e) {
             var features = e.features.getArray();
 
             if (features.length > 0) {
-              if (callback && typeof callback == 'function') {
+              if (callback && typeof callback == "function") {
                 var returnData = _this.getAllTypeValue(
                   features,
                   data.isOpenDFM,
@@ -3128,15 +4354,15 @@ export default {
         this.map.removeInteraction(this.snap);
       }
       const res = {
-        x: '',
-        y: '',
-        x2: '',
-        y2: '',
-        type: '',
-        wktValue: '',
-        firstPoint: ''
+        x: "",
+        y: "",
+        x2: "",
+        y2: "",
+        type: "",
+        wktValue: "",
+        firstPoint: "",
       };
-      if (callback && typeof callback == 'function') {
+      if (callback && typeof callback == "function") {
         callback.call(this.drawLayerObj[name], res);
       }
     },
@@ -3151,16 +4377,16 @@ export default {
 
       var type = features[0].getGeometry().clone().getType();
 
-      if (type.toLocaleLowerCase() == 'point') {
-        value[2] = '';
-        value[3] = '';
+      if (type.toLocaleLowerCase() == "point") {
+        value[2] = "";
+        value[3] = "";
       }
       value = this.judgeIsToDFM(value, isOpenDFM, fractionDigits);
       var result = {};
       result.x = value[0];
       result.y = value[1];
-      result.x2 = value[2] || '';
-      result.y2 = value[3] || '';
+      result.x2 = value[2] || "";
+      result.y2 = value[3] || "";
       result.type = type;
       result.wktValue = this.getWKTValueByFeatures(features);
       result.firstPoint = this.getFirstPoint(features[0]);
@@ -3172,8 +4398,8 @@ export default {
     },
 
     toStringHDMS: function (x, y, fractionDigits) {
-      var result = ['', ''];
-      if (x && x != '' && y && y != '') {
+      var result = ["", ""];
+      if (x && x != "" && y && y != "") {
         var str;
         if (fractionDigits) {
           str = new olCoordinate.toStringHDMS([x, y], fractionDigits); //返回例如："25° 53′ 11.07″ N 114° 57′ 09.72″ E"
@@ -3181,27 +4407,27 @@ export default {
           str = new olCoordinate.toStringHDMS([x, y]);
         }
         str = str
-          .replace(/ /g, '')
-          .replace('N', '|')
-          .replace('S', '|')
-          .replace('E', '|')
-          .replace('W', '|')
-          .split('|');
+          .replace(/ /g, "")
+          .replace("N", "|")
+          .replace("S", "|")
+          .replace("E", "|")
+          .replace("W", "|")
+          .split("|");
         result[0] = str[1];
         result[1] = str[0];
       }
       return result;
     },
     toStringXY: function (x, y, fractionDigits) {
-      var result = ['', ''];
-      if (x && x != '' && y && y != '') {
+      var result = ["", ""];
+      if (x && x != "" && y && y != "") {
         var str;
         if (fractionDigits) {
           str = new toStringXY([x, y], fractionDigits); //返回例如："114.986, 25.817"
         } else {
-          str = x + ',' + y;
+          str = x + "," + y;
         }
-        str = str.replace(/ /g, '').split(',');
+        str = str.replace(/ /g, "").split(",");
         result[0] = str[1];
         result[1] = str[0];
       }
@@ -3236,7 +4462,7 @@ export default {
     //根据多个要素取wkt坐标值（拼接的形式，对于相交的面拼成多面是否会造成无效坐标待考证）
     getWKTValueByFeatures: function (features) {
       if (features == null || features.length == 0) {
-        return '';
+        return "";
       }
       if (features.length == 1) {
         return this.getWKTByFeature(features[0]);
@@ -3247,27 +4473,27 @@ export default {
         for (var i = 0; i < features.length; i++) {
           var data = this.getWKTByFeature(features[i]);
           if (data.toUpperCase().indexOf(type.toUpperCase()) < 0) {
-            return '';
+            return "";
           }
           switch (type.toLocaleLowerCase()) {
-            case 'point':
+            case "point":
               arr.push(
-                data.substring(data.indexOf('(') + 1, data.indexOf(')'))
+                data.substring(data.indexOf("(") + 1, data.indexOf(")"))
               );
               if (i == features.length - 1) {
-                return 'MULTIPOINT(' + arr.join(',') + ')';
+                return "MULTIPOINT(" + arr.join(",") + ")";
               }
               break;
-            case 'linestring':
-              arr.push(data.substring(data.indexOf('(')));
+            case "linestring":
+              arr.push(data.substring(data.indexOf("(")));
               if (i == features.length - 1) {
-                return 'MULTILINESTRING(' + arr.join(',') + ')';
+                return "MULTILINESTRING(" + arr.join(",") + ")";
               }
               break;
-            case 'polygon':
-              arr.push(data.substring(data.indexOf('(')));
+            case "polygon":
+              arr.push(data.substring(data.indexOf("(")));
               if (i == features.length - 1) {
-                return 'MULTIPOLYGON(' + arr.join(',') + ')';
+                return "MULTIPOLYGON(" + arr.join(",") + ")";
               }
               break;
             default:
@@ -3283,14 +4509,14 @@ export default {
       }
       var type = feature.getGeometry().getType();
       var firstCoordinates = feature.getGeometry().getCoordinates();
-      if (type.toLocaleLowerCase() == 'point') {
+      if (type.toLocaleLowerCase() == "point") {
         firstCoordinates = firstCoordinates;
-      } else if (type.toLocaleLowerCase() == 'linestring') {
+      } else if (type.toLocaleLowerCase() == "linestring") {
         firstCoordinates = firstCoordinates[0];
-      } else if (type.toLocaleLowerCase() == 'polygon') {
+      } else if (type.toLocaleLowerCase() == "polygon") {
         firstCoordinates = firstCoordinates[0][0];
       }
-      return 'POINT(' + firstCoordinates[0] + ' ' + firstCoordinates[1] + ')';
+      return "POINT(" + firstCoordinates[0] + " " + firstCoordinates[1] + ")";
     },
 
     // 新增绘制功能，未整理 END
@@ -3305,49 +4531,49 @@ export default {
         filter.push(" year_no = '" + yearNo + "'");
       } */
 
-      let res = '';
+      let res = "";
 
-      if (params.is_delete !== undefined && params.is_delete !== '') {
+      if (params.is_delete !== undefined && params.is_delete !== "") {
         filter.push(`is_delete = ${params.is_delete}`);
       }
 
-      if (params.areaCode !== undefined && params.areaCode !== '') {
+      if (params.areaCode !== undefined && params.areaCode !== "") {
         filter.push(`area_code like '${params.areaCode}%'`);
       }
 
-      if (params.bnCode !== undefined && params.bnCode !== '') {
+      if (params.bnCode !== undefined && params.bnCode !== "") {
         filter.push(`bn_code like '${params.bnCode}%'`);
       }
 
-      if (params.sbuCode !== undefined && params.sbuCode !== '') {
+      if (params.sbuCode !== undefined && params.sbuCode !== "") {
         filter.push(`sbu_code like '${params.sbuCode}%'`);
       }
 
-      if (params.yearNo !== undefined && params.yearNo !== '') {
+      if (params.yearNo !== undefined && params.yearNo !== "") {
         filter.push(`year_no = '${params.yearNo}'`);
       }
 
-      if (params.nian_du !== undefined && params.nian_du !== '') {
+      if (params.nian_du !== undefined && params.nian_du !== "") {
         filter.push(`${params.nian_du}`);
       }
 
-      if (params.hs_bhyy !== undefined && params.hs_bhyy !== '') {
+      if (params.hs_bhyy !== undefined && params.hs_bhyy !== "") {
         filter.push(`${params.hs_bhyy}`);
       }
 
-      if (params.sheng !== undefined && params.sheng !== '') {
+      if (params.sheng !== undefined && params.sheng !== "") {
         filter.push(`${params.sheng}`);
       }
 
-      if (params.shi !== undefined && params.shi !== '') {
+      if (params.shi !== undefined && params.shi !== "") {
         filter.push(`${params.shi}`);
       }
 
-      if (params.xian !== undefined && params.xian !== '') {
+      if (params.xian !== undefined && params.xian !== "") {
         filter.push(`${params.xian}`);
       }
 
-      if (params.areaCodes !== undefined && params.areaCodes !== '') {
+      if (params.areaCodes !== undefined && params.areaCodes !== "") {
         filter.push(`${params.areaCodes}`);
       }
 
@@ -3363,7 +4589,7 @@ export default {
       if (filter.length > 0) {
         areaStr = areaStr + " and" + paramStr
       } */
-      res = filter.join(' and ');
+      res = filter.join(" and ");
       return res;
     },
 
@@ -3391,8 +4617,8 @@ export default {
         layer.position = layerInfo.position;
         layer.visible = layerInfo.visible;
         layer.filter = layerInfo.filter;
-        layer.format = layerInfo.format || 'image/png';
-        layer.version = layerInfo.version || '1.1.1';
+        layer.format = layerInfo.format || "image/png";
+        layer.version = layerInfo.version || "1.1.1";
         let layerObj = this.initWmsLayer(layer);
 
         /* let layerObj = new TileLayer({
@@ -3428,7 +4654,7 @@ export default {
         // },500)
         //console.log(layerObj.getSource().tmpExtent_)
 
-        if (typeof dataOption.layerEventFun == 'function') {
+        if (typeof dataOption.layerEventFun == "function") {
           this.bindEventForWmsLayer(dataOption);
         }
       }
@@ -3447,7 +4673,7 @@ export default {
           if (visible) {
             const name = v.values_.name;
 
-            let year = name.split('|');
+            let year = name.split("|");
             year = year[1];
 
             let filter = {};
@@ -3467,18 +4693,18 @@ export default {
         //判断弹框是否全部是图片
         document.getElementsByClassName(
           `popupImg_${this.id}`
-        )[0].style.display = 'block';
+        )[0].style.display = "block";
         popup_ = document.getElementsByClassName(`popupImg_${this.id}`)[0];
         this.imgType = popupObj.imgType;
       } else {
-        document.getElementById(`popup_${this.id}`).style.display = 'block';
+        document.getElementById(`popup_${this.id}`).style.display = "block";
         popup_ = document.getElementById(`popup_${this.id}`);
       }
 
       this.popupLoading = true;
       //document.getElementById("popup-content").innerHTML = popupObj.content;
       this.popupData = Object.assign({}, popupObj);
-      document.getElementById(`popup_${this.id}`).style.display = 'block';
+      document.getElementById(`popup_${this.id}`).style.display = "block";
       let popupWidth = 424;
       let popupHeight = 194;
       //框默认高度 + 获取文本内容渲染高度 + 默认40像素间隔
@@ -3498,13 +4724,13 @@ export default {
           element: document.getElementById(`popup_${this.id}`),
           //当前窗口可见
           autoPan: popupObj.autoPan || true,
-          positioning: popupObj.positioning || 'bottom-center',
+          positioning: popupObj.positioning || "bottom-center",
           stopEvent: popupObj.stopEvent || true,
           offset: popupObj.offset || [-(popupWidth / 2), -popupHeight],
           autoPanAnimation: {
             //当Popup超出地图边界时，为了Popup全部可见，地图移动的速度
-            duration: popupObj.duration || 250
-          }
+            duration: popupObj.duration || 250,
+          },
         });
         this.popupLayer = popupLayer;
       } else {
@@ -3520,12 +4746,12 @@ export default {
       //console.log('关闭的popupLayer', this.popupLayer);
       if (this.popupLayer) {
         this.popupLayer.setPosition(null);
-        document.getElementById(`popup_${this.id}`).style.display = 'none';
+        document.getElementById(`popup_${this.id}`).style.display = "none";
 
         //删除src\views\forestry-resource-monitor-system\dropchart-analysis-display\comprehensive-display.vue里定义的点击高亮图层
-        if (this.drawLayerObj['light_layer']) {
-          this.map.removeLayer(this.drawLayerObj['light_layer']);
-          delete this.drawLayerObj['light_layer'];
+        if (this.drawLayerObj["light_layer"]) {
+          this.map.removeLayer(this.drawLayerObj["light_layer"]);
+          delete this.drawLayerObj["light_layer"];
         }
       }
     },
@@ -3539,12 +4765,15 @@ export default {
         id: data.id,
         tel: data.tel,
         name: data.name,
-        show: true
+        show: true,
       };
     },
     handlePopupBtn: function (v) {
-      if (v.type === 'dialog') {
+      if (v.type === "dialog") {
         this.$emit(v.dialog.name, v.dialog.visible, v.dialog.params);
+        return;
+      } else if (v.type === "function") {
+        v.function(v.params);
         return;
       }
       this.showVideoConnection(v.data);
@@ -3554,10 +4783,10 @@ export default {
     //根据筛选参数更新图层
     updateLayerByFilter: function (layer, filter) {
       var filterParams = {
-        CQL_FILTER: null
+        CQL_FILTER: null,
       };
-      if (filter.replace(/^\s\s*/, '').replace(/\s\s*$/, '') != '') {
-        filterParams['CQL_FILTER'] = filter;
+      if (filter.replace(/^\s\s*/, "").replace(/\s\s*$/, "") != "") {
+        filterParams["CQL_FILTER"] = filter;
       }
       layer.getSource().updateParams(filterParams);
       layer.getSource().refresh({ force: true, active: true });
@@ -3569,29 +4798,108 @@ export default {
       }
       let eventTypeList = (
         layobj.layerEventType || this.defaultMap.layerEventType
-      ).split(',');
+      ).split(",");
       eventTypeList.forEach((clickType) => {
-        this.unBindEventForVector(clickType, 'wmslayerevent');
+        this.unBindEventForVector(clickType, "wmslayerevent");
         let self = this;
-        let key = this.map.on(clickType, function (e) {
+        let key = this.map.on(clickType, function (evt) {
           let layersInfo = {};
           for (let name in self.wmsLayerObj) {
             if (self.wmsLayerObj[name].getVisible()) {
               let url = self.getWmsUrlInfo(
-                e.coordinate,
+                evt.coordinate,
                 self.wmsLayerObj[name],
                 layobj.param
               );
               layersInfo[name] = url;
             }
           }
+          for (let name in self.wmtsLayerObj) {
+            if (self.wmtsLayerObj[name].getVisible()) {
+              let wmtslayer = self.wmtsLayerObj[name];
+              let view = self.view;
+              let layer = wmtslayer.layerOption;
+              var source = wmtslayer.getSource();
+              var resolution = view.getResolution();
+              var tilegrid = source.getTileGrid();
+              var tileResolutions = tilegrid.getResolutions();
+              var zoomIdx,
+                diff = Infinity;
+              for (var i = 0; i < tileResolutions.length; i++) {
+                var tileResolution = tileResolutions[i];
+                var diffP = Math.abs(resolution - tileResolution);
+                if (diffP < diff) {
+                  diff = diffP;
+                  zoomIdx = i;
+                }
+                if (tileResolution < resolution) {
+                  break;
+                }
+              }
+              var tileSize = tilegrid.getTileSize(zoomIdx);
+              var tileOrigin = tilegrid.getOrigin(zoomIdx);
+              var fx =
+                (evt.coordinate[0] - tileOrigin[0]) /
+                (resolution * tileSize[0]);
+              var fy =
+                (tileOrigin[1] - evt.coordinate[1]) /
+                (resolution * tileSize[1]);
+              var tileCol = Math.floor(fx);
+              var tileRow = Math.floor(fy);
+              var tileI = Math.floor((fx - tileCol) * tileSize[0]);
+              var tileJ = Math.floor((fy - tileRow) * tileSize[1]);
+              var matrixIds = tilegrid.getMatrixIds()[zoomIdx];
+              var matrixSet = source.getMatrixSet();
+
+              var url = layer.baseUrl + "?";
+              let defaultWmtsParams = {
+                VERSION: "1.0.0",
+                LAYER: layer.layer,
+                STYLE: layer.style,
+                TILEMATRIX: layer.matrixIds,
+                TILEMATRIXSET: layer.matrixSet,
+                SERVICE: "WMTS",
+                FORMAT: layer.format,
+              };
+              Object.keys(defaultWmtsParams).forEach((param) => {
+                if (param.toUpperCase() == "TILEMATRIX") {
+                  url = url + "TILEMATRIX=" + matrixIds + "&";
+                } else {
+                  url = url + param + "=" + defaultWmtsParams[param] + "&";
+                }
+              });
+              url =
+                url +
+                "SERVICE=WMTS&REQUEST=GetFeatureInfo" +
+                "&INFOFORMAT=" +
+                layer.infoFormat +
+                "&TileCol=" +
+                tileCol +
+                "&TileRow=" +
+                tileRow +
+                "&I=" +
+                tileI +
+                "&J=" +
+                tileJ;
+
+              if (url) {
+                for (let name2 in self.wmtsLayerObj) {
+                  if (self.wmtsLayerObj[name2].getVisible()) {
+                    if (name == name2) {
+                      layersInfo[name2] = url;
+                    }
+                  }
+                }
+              }
+            }
+          }
           if (
             [typeof layobj[clickType], typeof layobj.layerEventFun].includes(
-              'function'
+              "function"
             )
           ) {
             let eventFun = layobj[clickType] || layobj.layerEventFun;
-            eventFun.call(e, e.coordinate, layersInfo);
+            eventFun.call(evt, evt.coordinate, layersInfo);
           }
         });
       });
@@ -3603,10 +4911,10 @@ export default {
       if (!layobj) {
         return;
       }
-      let layerName = layobj.get('name');
+      let layerName = layobj.get("name");
       let eventTypeList = (
         dataOption.layerEventType || this.defaultMap.layerEventType
-      ).split(',');
+      ).split(",");
       eventTypeList.forEach((clickType) => {
         this.unBindEventForVector(clickType, layerName);
         let self = this;
@@ -3616,7 +4924,7 @@ export default {
             var feature = self.getFeatureByPixel(e.pixel, layobj);
             if (
               [typeof mapEventCallBack, typeof dataOption[clickType]].includes(
-                'function'
+                "function"
               )
             ) {
               let eventFun = dataOption[clickType] || mapEventCallBack;
@@ -3632,14 +4940,14 @@ export default {
     getWmsUrlInfo: function (coordinate, layer, param) {
       if (param) {
         param = Object.assign(
-          { INFO_FORMAT: 'application/json', FEATURE_COUNT: 50 },
+          { INFO_FORMAT: "application/json", FEATURE_COUNT: 10 },
           param
         );
       } else {
-        param = { INFO_FORMAT: 'application/json', FEATURE_COUNT: 50 };
+        param = { INFO_FORMAT: "application/json", FEATURE_COUNT: 10 };
       }
 
-      //param = Object.assign( { 'INFO_FORMAT': 'application/json', 'FEATURE_COUNT': 50 },param) ;//$.extend({},, param);
+      //param = Object.assign( { 'INFO_FORMAT': 'application/json', 'FEATURE_COUNT': 10 },param) ;//$.extend({},, param);
       var source = layer.getSource();
       //console.log(source)
       var url = source.getFeatureInfoUrl(
@@ -3657,8 +4965,8 @@ export default {
         function (feature, layer) {
           if (feature) {
             if (layer != null) {
-              let name = layer.get('name');
-              if (name == layobj.get('name')) {
+              let name = layer.get("name");
+              if (name == layobj.get("name")) {
                 return feature;
               }
             }
@@ -3687,6 +4995,16 @@ export default {
       return result;
     },
 
+    fitByPoint(point, zoom) {
+      let center = !isArray(point) ? this.getCoordinatesByWkt(point) : point;
+      if (this.mapAnimation) {
+        this.view.animate({
+          zoom: zoom || this.view.getZoom(),
+          center,
+        });
+      } else {
+      }
+    },
     fitByExtent: function (extent, changeZoom, fitoptions, map) {
       //debugger
       map = map || this.map;
@@ -3697,16 +5015,30 @@ export default {
         fitoptions = Object.assign(fitoptions, {
           maxZoom: zoom,
           minZoom: zoom,
-          constrainResolution: true
-        }); //对象合并，相当于jquery的$.extend({}, fitoptions || {}, { maxZoom: zoom, minZoom: zoom, constrainResolution: true });
-        this.view.fit(extent, fitoptions);
+          constrainResolution: true,
+        }); //对象合并，相当于jquery的$.extend({}, fitoptions || {}, { maxZoom: zoom, minZoom: zoom, constrainResolution: true }); // 缩放平移操作，移动到中心点
+      }
+      if (this.mapAnimation) {
+        this.view.animate({
+          zoom: fitoptions.zoom || zoom,
+          center: new getCenter(extent),
+        });
       } else {
         this.view.fit(extent, fitoptions);
       }
     },
-
     //设置坐标样式
     setCoordStyle: function (olStyleObj) {
+      let styleArr = [];
+      if (isArray(olStyleObj)) {
+        olStyleObj.forEach((style) => styleArr.push(this.getStyleArr(style)));
+        styleArr = styleArr.flat();
+      } else {
+        styleArr = this.getStyleArr(olStyleObj);
+      }
+      return styleArr;
+    },
+    getStyleArr(olStyleObj) {
       let style = {};
       var styleArr = [];
       if (olStyleObj) {
@@ -3748,26 +5080,26 @@ export default {
           iconStyle.geometry = function (feature) {
             var type = feature.getGeometry().getType().toLocaleLowerCase();
             var coordinates = feature.getGeometry().getCoordinates();
-            if (type == 'point') {
+            if (type == "point") {
               return feature.getGeometry(); //返回自身
-            } else if (type == 'multipoint') {
+            } else if (type == "multipoint") {
               return feature.getGeometry(); //返回自身
-            } else if (type == 'linestring') {
+            } else if (type == "linestring") {
               var arr = [];
               arr.push(coordinates[0]);
               arr.push(coordinates[coordinates.length - 1]);
               return new MultiPoint(arr); //返回线的头尾点
-            } else if (type == 'multilinestring') {
+            } else if (type == "multilinestring") {
               var arr = [];
               for (var i = 0; i < coordinates.length; i++) {
                 arr.push(coordinates[i][0]);
                 arr.push(coordinates[i][coordinates[i].length - 1]);
               }
               return new MultiPoint(arr); //返回每条线的头尾点
-            } else if (type == 'polygon') {
+            } else if (type == "polygon") {
               //debugger
               return new Point(coordinates[0][0]); //返回第一点
-            } else if (type == 'multipolygon') {
+            } else if (type == "multipolygon") {
               var arr = [];
               for (var i = 0; i < coordinates.length; i++) {
                 arr.push(coordinates[i][0][0]);
@@ -3809,7 +5141,6 @@ export default {
       }
       return styleArr;
     },
-
     showCoordinate: function (coords, olStyle, attrObj) {
       /*
           coords:wkt坐标
@@ -3820,11 +5151,11 @@ export default {
         let feature;
         let _geometry = new WKT().readGeometry(coords);
         feature = new Feature({
-          geometry: _geometry
+          geometry: _geometry,
         });
         if (attrObj) {
           //将属性信息绑定到这个坐标元素上
-          feature.set('attr', attrObj);
+          feature.set("attr", attrObj);
 
           //设置ID
           feature.setId(attrObj.id);
@@ -3876,17 +5207,17 @@ export default {
       let layer;
       if (layers) {
         let layArr = layers.getArray();
-        for (let index in layArr) {
+        for (let index = 0; index < layArr.length; index++) {
           let item = layArr[index];
           if (item.getLayers) {
             for (let node in item.getLayers().getArray()) {
-              if (layerName == node.get('name')) {
+              if (layerName == node.get("name")) {
                 layer = item;
                 return layer;
               }
             }
           } else {
-            if (layerName == item.get('name')) {
+            if (layerName == item.get("name")) {
               layer = item;
               return layer;
             }
@@ -3894,8 +5225,8 @@ export default {
         }
       }
       return layer;
-    }
-  }
+    },
+  },
 };
 </script>
 <style scoped>
@@ -3984,14 +5315,14 @@ export default {
   position: relative;
 }
 .popup .body .hd {
-  background: url('./image/point-item-bg-hd.png') no-repeat;
+  background: url("./image/point-item-bg-hd.png") no-repeat;
   width: 424px;
   height: 80px;
   overflow: hidden;
   position: relative;
 }
 .popup .body .bd {
-  background: url('./image/point-item-bg-bd.png') repeat-y;
+  background: url("./image/point-item-bg-bd.png") repeat-y;
   width: 424px;
   padding: 0 20px;
   display: flex;
@@ -3999,14 +5330,14 @@ export default {
   flex-wrap: wrap;
 }
 .popup .body .ft {
-  background: url('./image/point-item-bg-ft.png') no-repeat;
+  background: url("./image/point-item-bg-ft.png") no-repeat;
   width: 424px;
   height: 80px;
   overflow: hidden;
   position: relative;
 }
 .popup .close {
-  background: url('./image/point-item-close.png') no-repeat;
+  background: url("./image/point-item-close.png") no-repeat;
   width: 64px;
   height: 32px;
   overflow: hidden;
@@ -4036,7 +5367,7 @@ export default {
     30 3;
 }
 .popup .close:hover {
-  background-image: url('./image/point-item-close-hover.png');
+  background-image: url("./image/point-item-close-hover.png");
   top: 6px;
 }
 .popup .bd .item {
@@ -4081,7 +5412,7 @@ export default {
 }
 
 .popup .btn {
-  background: url('./image/point-item-btn.png') no-repeat;
+  background: url("./image/point-item-btn.png") no-repeat;
   width: 112px;
   height: 39px;
   line-height: 39px;
@@ -4093,18 +5424,18 @@ export default {
   display: inline-block;
 }
 .popup .btn:hover {
-  background-image: url('./image/point-item-btn-hover.png');
+  background-image: url("./image/point-item-btn-hover.png");
 }
 
 .popup .arrow {
-  background: url('./image/point-item-arrow.png') no-repeat;
+  background: url("./image/point-item-arrow.png") no-repeat;
   width: 45px;
   height: 24px;
   margin: 0 auto 10px;
   overflow: hidden;
 }
 .popup .label {
-  background: url('./image/point-item-label.png') no-repeat;
+  background: url("./image/point-item-label.png") no-repeat;
   width: 93px;
   height: 29px;
   line-height: 27px;
@@ -4228,7 +5559,6 @@ export default {
   height: 100%;
   width: 100%;
   z-index: 9;
-  background-color: #fff;
 }
 .map-roller #roller {
   width: 100%;
@@ -4309,6 +5639,23 @@ export default {
 }
 </style>
 <style lang="scss">
+.ol-tooltip {
+  position: relative;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  color: white !important;
+  padding: 4px 8px;
+  opacity: 0.7;
+  white-space: nowrap;
+  font-size: 12px;
+  cursor: default;
+  user-select: none;
+}
+
+.ol-tooltip-measure {
+  opacity: 1;
+  font-weight: bold;
+}
 .map-roller .point .el-slider__runway {
   background-color: transparent;
 }
@@ -4318,7 +5665,7 @@ export default {
 .map-people {
   height: 58px;
   width: 64px;
-  background: url('./image/foot.gif');
+  background: url("./image/foot.gif");
   background-size: 100%;
   background-repeat: no-repeat;
   background-position: center bottom;
@@ -4326,13 +5673,13 @@ export default {
 .map-uav {
   height: 32px;
   width: 32px;
-  background: url('./image/fj.png');
+  background: url("./image/fj.png");
   background-size: 100%;
   background-repeat: no-repeat;
   background-position: center bottom;
 }
 .left-people {
-  background: url('./image/foot-left.gif');
+  background: url("./image/foot-left.gif");
 }
 .speed-control {
   position: absolute;
@@ -4384,7 +5731,7 @@ export default {
         height: 10px;
         background: rgba(8, 108, 235, 1);
         z-index: 2;
-        content: '';
+        content: "";
         width: 100%;
       }
       height: 30px;
@@ -4403,7 +5750,7 @@ export default {
     width: 1px;
     bottom: 0;
     margin-left: 3px;
-    background-color: rgba(255, 255, 255, 0.4);
+    background-color: rgba(255, 255, 255, 0);
   }
   .el-slider__button-wrapper {
     top: 0;
@@ -4429,10 +5776,162 @@ export default {
   border-top: 6px solid #ffff00;
   border-right: 6px solid transparent;
   border-left: 6px solid transparent;
-  content: '';
+  content: "";
   position: absolute;
   bottom: -5px;
   margin-left: -7px;
   left: 50%;
+}
+
+.map-search-box {
+  position: absolute;
+  top: 30px;
+  left: 10px;
+  z-index: 1;
+  display: flex;
+  background: #fff;
+  border-radius: 3px;
+  padding: 10px;
+  flex-wrap: wrap;
+  .w150 {
+    width: 150px;
+  }
+  .map-box-right {
+    font-size: 14px;
+    color: #666;
+  }
+  .chose-type {
+    width: 80px;
+    margin-right: 10px;
+  }
+  .map-box-bottom {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .address {
+    width: 200px;
+  }
+}
+</style>
+<style lang="scss" scoped>
+.map-ranging {
+  position: absolute;
+  top: 0px;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 9;
+  background-color: #fff;
+  // padding: 20px;
+  .close {
+    background-color: #fff;
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    text-align: center;
+    color: #000;
+    font-size: 24px;
+    font-weight: bold;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 132;
+    cursor: pointer;
+  }
+}
+.map-roller-year {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 999;
+  background-color: #fff;
+  .roller-box1 {
+    position: absolute;
+    // top: 0;
+    // left: 0;
+    width: 100%;
+    height: 100%;
+    // background-color: red;
+    // z-index: 111;
+  }
+  .roller-box2 {
+    position: relative;
+    // top: 50%;
+    // left: 0;
+    // width: 100%;
+    height: 100%;
+    // background-color: blue;
+    // z-index: 121;
+    overflow: hidden;
+    .roller-select2 {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 14;
+    }
+    .roller-year-select2 {
+      position: absolute;
+      top: 10px;
+      right: 222px;
+      z-index: 14;
+    }
+  }
+  .roller-select1 {
+    position: absolute;
+    top: 10px;
+    // right: -100px;
+    z-index: 131;
+  }
+  .roller-year-select1 {
+    position: absolute;
+    top: 10px;
+    margin-left: 222px;
+    // right: -100px;
+    z-index: 131;
+  }
+  .point {
+    width: 100%;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    z-index: 133;
+  }
+  .mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    border-left: 2px solid rgba(38, 92, 133, 0.8);
+    background-color: rgba(38, 92, 133, 0.2);
+    z-index: 131;
+  }
+  .close {
+    background-color: #fff;
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    text-align: center;
+    color: #000;
+    font-size: 24px;
+    font-weight: bold;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 132;
+    cursor: pointer;
+  }
+}
+.map-roller-year .point {
+  ::v-deep .el-slider__runway,
+  ::v-deep .el-slider__bar {
+    background-color: transparent;
+  }
+}
+.map-roller-year .point .el-slider__bar {
+  background-color: transparent;
 }
 </style>

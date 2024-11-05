@@ -1,7 +1,7 @@
 export default {
     geo2: {
-        'type': 'Polygon',
-        'coordinates': [
+        "type": "Polygon",
+        "coordinates": [
             [
                 [
                     117.225866827392,
@@ -101,7 +101,7 @@ export default {
                 ]
             ]
         ],
-        'bbox': [
+        "bbox": [
             117.22584732034161,
             29.366846448649625,
             117.22619102399663,
@@ -109,8 +109,8 @@ export default {
         ]
     },
     geo: {
-        'type': 'MultiPolygon',
-        'coordinates': [
+        "type": "MultiPolygon",
+        "coordinates": [
             [
                 [
                     [
@@ -60920,7 +60920,7 @@ export default {
                 ]
             ]
         ],
-        'bbox': [
+        "bbox": [
             113.57276959,
             24.48894149,
             118.48212339,

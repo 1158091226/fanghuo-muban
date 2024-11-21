@@ -61,6 +61,9 @@ export default {
         //   popText: '多个弹窗展示字段',
         //   isChange: true时，list设置为空数组可强制获取新数据,
         //   showDetailType: '详情弹窗类型默认detail,设置pop为地图组件小窗口'
+        //   areaCqlKey: "图层默认查询区划cql字段默认为area_code"
+        //   yearCqlKey: "图层默认查询区划cql字段默认为year_no"
+        //   cqlList: [],  //areaCql '图层自动拼接区划sql'  yearCql //图层自动拼接年版号   areaLengthCql //图层自动拼接区划长度cql
         // },
       ],
       mapTimer: null,
@@ -80,6 +83,18 @@ export default {
     this.clearTime();
   },
   methods: {
+    async fitBySimplifyBoundary(padding = [0, 400, 0, 400]) {
+      let res = await getSimplifyBoundary1({
+        areaCode: this.mapQuery.areaCode,
+        tolerance: this.$tolerance(this.mapQuery.areaCode),
+        type: 0,
+      });
+      this.$refs[this.mapQuery.mapName].fitByWKT(
+        [res.data[0].boundaryLine],
+        true,
+        padding
+      );
+    },
     // 绘制区划边界
     async showSimplifyBoundary() {
       if (!this.loading && this.mapAreaQuery.showArea) {
@@ -558,12 +573,29 @@ export default {
           filter.areaCode = typeObj.onlyAreaCode || typeObj.areaCode;
           obj.layerInfo.filter =
             this.$refs[this.mapQuery.mapName]?.getLayerFilter(filter);
-        } else if (typeObj.filterSql) {
-          obj.layerInfo.filter = typeObj.filterSql;
-          // let areaCql = `area_code like '${typeObj.areaCode}%'`;
-          // obj.layerInfo.filter = typeObj.filterSql
-          //   ? `${typeObj.filterSql} and ${areaCql}`
-          //   : areaCql;
+        } else if (typeObj.cqlList?.length) {
+          // obj.layerInfo.filter = typeObj.filterSql;
+          let cqlObj = {};
+          cqlObj.areaCql = `${typeObj.areaCqlKey || "area_code"} like '${
+            typeObj.areaCode
+          }%'`;
+          cqlObj.yearCql = `${typeObj.yearCqlKey || "year_no"} = '${
+            typeObj.yearNo
+          }'`;
+          let areaLevelNum =
+            typeObj.areaCode.getAreaLevel() < 5
+              ? typeObj.areaCode.getAreaLevel() + 1
+              : typeObj.areaCode.getAreaLevel();
+          cqlObj.areaLengthCql = `area_level_num = ${areaLevelNum} and area_code like '${typeObj.areaCode}%'`;
+          let allCql = [];
+          typeObj.cqlList.forEach((key) => {
+            if (cqlObj[key]) {
+              allCql.push(cqlObj[key]);
+            }
+          });
+          obj.layerInfo.filter =
+            (typeObj.filterSql ? `${typeObj.filterSql} and ` : "") +
+            `${allCql.join(" and ")}`;
         }
         obj.layerInfo.work = typeObj.work;
         // obj.layerInfo.layerName = typeObj.list[0].fileGuid;
@@ -582,7 +614,8 @@ export default {
           obj.layerInfo.resolutions = typeObj.resolutions;
           obj.layerInfo.gridNames = typeObj.gridNames;
           obj.layerInfo.gridsetName = typeObj.gridsetName;
-          obj.layerInfo.url = obj.layerInfo.url + obj.layerInfo.work;
+          obj.layerInfo.url =
+            obj.layerInfo.url + obj.layerInfo.work + "/gwc/service/wmts";
         }
         obj.layerEventFun = async (coordinate, feature) => {
           if (!typeObj.active || this.mapQuery.loading) {

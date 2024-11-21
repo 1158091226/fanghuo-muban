@@ -7,7 +7,7 @@ import {
 } from "@/api/layerLegendManage/mcpLayer";
 import CryptoJS from "crypto-js";
 import { set16ToRgb } from "@/utils/custom";
-import {deepClone} from "@/utils";
+import { deepClone } from "@/utils";
 export default {
   data() {
     return {
@@ -17,7 +17,7 @@ export default {
         // isLeaf: "isLeaf",
       },
       treeData: [],
-      TlMapTypeList:[],
+      TlMapTypeList: [],
       checkTreeObj: {
         // 33: {
         //   type: "enName",
@@ -141,7 +141,7 @@ export default {
           item.active = parent.active ? true : false;
           parent.childList.push(item);
         } else {
-          item.tableName = '';
+          item.tableName = "";
           arr.push(item);
         }
       });

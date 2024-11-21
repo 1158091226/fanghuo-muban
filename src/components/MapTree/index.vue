@@ -38,9 +38,10 @@ export default {
           type: "enName",
           name: "cnName",
           work: "workArea",
-          tableName: "originTableName",
-          layerName: "originTableName",
-          geoBsm: "originTableName",
+          tableName: "geoBsm",
+          layerName: "geoBsm",
+          isWmts: "isWmts",
+          geoBsm: "geoBsm",
           filterSql: "cqlFilter",
           nodeTypeId: "nodeTypeId",
           color: "fillColor",
@@ -68,6 +69,7 @@ export default {
           nodeTypeId: "nodeTypeId",
         },
       },
+      checkStrictly: false,
       clearTypeList: [33, 2, 55],
       secretKey: CryptoJS.enc.Utf8.parse("zlsk567890123!#?"),
       iv: CryptoJS.enc.Utf8.parse("zlsk567890123!#?"),
@@ -79,6 +81,164 @@ export default {
   mixins: [DrawMapLayer],
   mounted() {},
   methods: {
+    renderContent(h, { node, data, store }) {
+      if (data.isWmts) {
+        data[this.defaultProps.children]?.forEach((item) => {
+          item.addWmtsClass = true;
+        });
+      }
+      return h(
+        "div",
+        {
+          class: `custom-tree-node ${data.type == 0 ? "el-tree-menu" : ""} ${
+            node.checked ? "node-checked" : ""
+          } ${data.addWmtsClass ? "wmts-box" : ""}`,
+        },
+        [
+          h(
+            "div",
+            {
+              class: "tree-node-item",
+            },
+            [
+              h(
+                "div",
+                {
+                  class: "label-class",
+                  style: {
+                    fontSize: data.foneSize + "px",
+                    fontWeight: data.fontWeight,
+                  },
+                },
+                data.cnName
+              ),
+              h("div", { class: "flex" }, [
+                data.geoBsm &&
+                  data.type === 55 &&
+                  data.geometryType == "Point" &&
+                  h(
+                    "div",
+                    {
+                      class: "ml-10",
+                    },
+                    [
+                      h("img", {
+                        style: { width: "21px", height: "24px" },
+                        attrs: {
+                          src: data.pointWellKnownName,
+                        },
+                      }),
+                    ]
+                  ),
+                data.type === 55 &&
+                  data.geometryType == "Point" &&
+                  h("div", {
+                    class: "ml-10",
+                    style: {
+                      backgroundColor: data.fillColor || "red" || "transparent",
+                      width: "30px",
+                      height: "10px",
+                    },
+                  }),
+                data.geoBsm &&
+                  data.type === 55 &&
+                  data.geometryType == "Polygon" &&
+                  h(
+                    "div",
+                    {
+                      class: "ml-10",
+                    },
+                    [
+                      h("img", {
+                        style: {
+                          width: "21px",
+                          height: "24px",
+                          "background-color": "#0052d9",
+                          "border-radius": "4px",
+                        },
+                        attrs: {
+                          src: "@/static/templateImages/polygon.png",
+                        },
+                      }),
+                    ]
+                  ),
+                data.geoBsm &&
+                  data.type === 55 &&
+                  data.geometryType == "Line" &&
+                  h(
+                    "div",
+                    {
+                      class: "ml-10",
+                    },
+                    [
+                      h("img", {
+                        style: {
+                          width: "21px",
+                          height: "24px",
+                          "background-color": "#0052d9",
+                          "border-radius": "4px",
+                        },
+                        attrs: {
+                          src: "@/static/templateImages/line.png",
+                        },
+                      }),
+                    ]
+                  ),
+                data.type === 55 &&
+                  data.geometryType == "Polygon" &&
+                  h("div", {
+                    class: "ml-10",
+                    style: {
+                      backgroundColor: data.fillColor || "transparent",
+                      borderWidth: data.strokeWidth
+                        ? data.strokeWidth + "px"
+                        : "0px",
+                      borderColor: data.strokeColor,
+                      opacity: data.fillOpacity,
+                      borderStyle: "solid",
+                      width: "30px",
+                      height: "10px",
+                    },
+                  }),
+                data.type === 55 &&
+                  data.geometryType == "Line" &&
+                  h("div", {
+                    class: "ml-10",
+                    style: {
+                      backgroundColor: data.fillColor || "transparent",
+                      borderWidth: data.strokeWidth
+                        ? data.strokeWidth + "px"
+                        : "0px",
+                      borderColor: data.strokeColor,
+                      opacity: data.fillOpacity,
+                      borderStyle: "solid",
+                      width: "30px",
+                      height: "10px",
+                    },
+                  }),
+                data.type === 4 &&
+                  data.geometryType == "Polygon" &&
+                  h("div", {
+                    class: "ml-10",
+                    style: {
+                      backgroundColor:
+                        set16ToRgb(data.fillColor, data.fillOpacity) ||
+                        "transparent",
+                      borderWidth: data.strokeWidth
+                        ? data.strokeWidth + "px"
+                        : "0px",
+                      borderColor: data.strokeColor,
+                      borderStyle: "solid",
+                      width: "30px",
+                      height: "10px",
+                    },
+                  }),
+              ]),
+            ]
+          ),
+        ]
+      );
+    },
     encrypt(data) {
       //加密
       if (data) {
@@ -101,14 +261,24 @@ export default {
       });
       return JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
     },
-    async getTreeData() {
+    async getTreeData(treeQueryObj = { treeDataName: "treeData", mapKey: "" }) {
       //获取图层树数据
       let res = await v1LayerServerLegendTree({
-        mapKey: this.$route.query.mapKey || this.mapKey || "ZheOktp9tM",
+        mapKey:
+          treeQueryObj.mapKey ||
+          this.$route.query.mapKey ||
+          this.mapKey ||
+          "ZheOktp9tM",
       });
-      this.treeData = [res.data];
-      this.checkTreeData(this.treeData);
-      this.treeData = [...this.treeData];
+      this[treeQueryObj.treeDataName] = [res.data];
+      this.checkTreeData(
+        this[treeQueryObj.treeDataName],
+        treeQueryObj.treeDataName
+      );
+      this[treeQueryObj.treeDataName] = [...this[treeQueryObj.treeDataName]];
+      return new Promise((resolve) => {
+        resolve();
+      });
     },
     checkCql(childList, keysArray) {
       //获取当前图层的图例以及对应图层树勾选id
@@ -123,12 +293,15 @@ export default {
       filterSql = `(${filterSql.join(" or ")})`;
       return filterSql;
     },
-    handleCheckChange(data, nodeArray) {
+    handleCheckChange(treeName = "treeData", data, nodeArray) {
       //图层树点击事件
       let keys = [...nodeArray.checkedKeys, ...nodeArray.halfCheckedKeys];
-      this.mapTypeList.forEach((item) => {
+      let mapArr = this.mapTypeList.filter((item) => item.treeName == treeName);
+      console.log(mapArr);
+      mapArr.forEach((item) => {
+        1;
         let active = null;
-        if (nodeArray.checkedKeys.includes(item.nodeTypeId)) {
+        if (keys.includes(item.nodeTypeId)) {
           active = true;
         }
         if (item.mapType === 2 && keys.includes(item.nodeTypeId)) {
@@ -163,7 +336,7 @@ export default {
       this.scopeForm.query = query;
       this.showPopDetail = true;
     },
-    checkTreeData(data) {
+    checkTreeData(data, treeName) {
       //遍历图层树，确认需要绘制的图层图例数据结构
       for (let index = 0; index < data.length; index++) {
         let item = data[index];
@@ -257,11 +430,14 @@ export default {
         });
         if (this.clearTypeList.includes(item.type)) {
           //获取需要绘制的类型数据
+          obj.nodeTypeId = item.nodeTypeId;
+          obj.id = item.id;
           obj.clusterText = "title";
+          obj.treeName = treeName;
           obj.list = [];
+          obj.type = obj.isWmts ? obj.type + "wmts" : obj.type;
           obj.isMultiple = 1; //树形结构全部为多选，不取接口值
           obj.layerType = 1; //默认为数据库发布参数
-          obj.active = true;
           obj.getData = async function (type, active) {
             // that给对比使用，是改变this的指向问题
             //获取专题图层数据
@@ -286,13 +462,19 @@ export default {
           };
           obj.getDetail = this.mapGetDetail;
           this.mapTypeList.push(obj);
+          // let typeObj = this.findTypeObj(obj.type) || "";
+          // if (!typeObj) {
+          //   this.mapTypeList.push(obj);
+          // } else {
+          //   typeObj.copyNodeTypeId = item.nodeTypeId;
+          // }
         }
         if (
           this.defaultProps &&
           item[this.defaultProps.children] &&
           item[this.defaultProps.children].length > 0
         ) {
-          this.checkTreeData(item[this.defaultProps.children]);
+          this.checkTreeData(item[this.defaultProps.children], treeName);
         }
       }
     },

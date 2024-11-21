@@ -819,11 +819,15 @@ export default {
   data() {
     const defaultMap = {
       //初始化地图配置项
-      center: [114.99114990234375, 27.119064331054688],
+      center: this.CommonConst.mapDefault.center || [
+        114.99114990234375, 27.119064331054688,
+      ],
       maxZoom: 18,
       minZoom: 4,
       zoom: 7,
-      extent: [113.3436, 24.2914, 118.2858, 30.0441],
+      extent: this.CommonConst.mapDefault.center || [
+        113.3436, 24.2914, 118.2858, 30.0441,
+      ],
       interactions: defaultInteractions({
         pinchRotate: false, // 移动端禁止地图旋转
         doubleClickZoom: false, //禁止双击放大地图
@@ -921,8 +925,8 @@ export default {
         },
         {
           index: 0,
-          url: "https://jx.zhlzz.com:8036/slzy_yx/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: "http://124.193.194.41/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          // url: "https://jx.zhlzz.com:8036/slzy_yx/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          url: "http://124.193.194.41/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_0",
           title: "即时影像",
           type: 0,
@@ -934,8 +938,8 @@ export default {
         },
         {
           index: 0,
-          url: "https://jx.zhlzz.com:8036/slzy_2021/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: "http://124.193.194.42:8080/onemap21/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          // url: "https://jx.zhlzz.com:8036/slzy_2021/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          url: "http://124.193.194.42:8080/onemap21/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_1",
           title: "2021版影像",
           type: 0,
@@ -947,8 +951,8 @@ export default {
         },
         {
           index: 0,
-          url: "https://jx.zhlzz.com:8036/slzy_2020/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: "http://124.193.194.42:8080/onemap20/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          // url: "https://jx.zhlzz.com:8036/slzy_2020/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          url: "http://124.193.194.42:8080/onemap20/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_2",
           title: "2020版影像",
           type: 0,
@@ -960,8 +964,8 @@ export default {
         },
         {
           index: 0,
-          url: "https://jx.zhlzz.com:8036/slzy_2019/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: "http://124.193.194.42:8080/onemap19/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          // url: "https://jx.zhlzz.com:8036/slzy_2019/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          url: "http://124.193.194.42:8080/onemap19/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_3",
           title: "2019版影像",
           type: 0,
@@ -973,8 +977,8 @@ export default {
         },
         {
           index: 0,
-          url: "https://jx.zhlzz.com:8036/slzy_2018/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: "http://124.193.194.42:8080/onemap18/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          // url: "https://jx.zhlzz.com:8036/slzy_2018/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          url: "http://124.193.194.42:8080/onemap18/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_4",
           title: "2018版影像",
           type: 0,
@@ -986,8 +990,8 @@ export default {
         },
         {
           index: 0,
-          url: "https://jx.zhlzz.com:8036/slzy_2017/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
-          // url: "http://124.193.194.42:8080/onemap17/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          // url: "https://jx.zhlzz.com:8036/slzy_2017/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
+          url: "http://124.193.194.42:8080/onemap17/rest/wmts?ACCOUNT=admin&PASSWD=admin123&layer=satImage&style=default&tilematrixset=satImage&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg&TileMatrix={0}&TileCol={1}&TileRow={2}",
           name: "image_layer_5",
           title: "2017版影像",
           type: 0,
@@ -3510,7 +3514,7 @@ export default {
     // 地图放大
     zoomIn(zoomNum) {
       // this.terrainSmallSelect = 2;
-      let zoom = zoomNum || this.view.getZoom() + 2;
+      let zoom = zoomNum || this.view.getZoom() + 1;
       if (this.mapAnimation) {
         this.view.animate({
           zoom,
@@ -3523,7 +3527,7 @@ export default {
     // 地图缩小
     zoomOut(zoomNum) {
       // this.terrainSmallSelect = 1;
-      let zoom = zoomNum || this.view.getZoom() - 2;
+      let zoom = zoomNum || this.view.getZoom() - 1;
       if (this.mapAnimation) {
         this.view.animate({
           zoom,

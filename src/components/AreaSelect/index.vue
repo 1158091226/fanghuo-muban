@@ -64,7 +64,7 @@ export default {
     },
   },
   data() {
-    let allTreeData = this.$store.getters.allTreeData;
+    // let allTreeData = this.$store.getters.allTreeData;
     return {
       tree: [],
       props: {
